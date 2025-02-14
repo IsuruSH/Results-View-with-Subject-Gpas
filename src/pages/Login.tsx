@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { GraduationCap } from "lucide-react";
@@ -12,18 +12,22 @@ export default function Login() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await signIn(username, password);
-      navigate("/");
-    } catch (error) {
-      toast.error("Invalid credentials");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+
+      try {
+        await Promise.resolve(signIn(username, password));
+        navigate("/");
+      } catch (error) {
+        toast.error("Invalid credentials");
+      } finally {
+        setTimeout(() => setLoading(false), 200);
+      }
+    },
+    [username, password, signIn, navigate]
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
@@ -50,11 +54,7 @@ export default function Login() {
           </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          action="https://paravi.ruh.ac.lk/login"
-          className="space-y-6"
-        >
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label
               htmlFor="username"

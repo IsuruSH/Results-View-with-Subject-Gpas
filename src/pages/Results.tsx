@@ -124,8 +124,6 @@ export default function Results() {
     }
   };
 
-  console.log("username", username);
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}

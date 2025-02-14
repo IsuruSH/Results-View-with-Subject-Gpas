@@ -71,6 +71,7 @@ export default function Login() {
               required
               autoComplete="username webauthn"
               data-associated-domain="paravi.ruh.ac.lk"
+              placeholder="SC12555"
             />
           </div>
 

@@ -198,7 +198,7 @@ export default function Results() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="mt-6 flex justify-center"
+            className="mt-6 mb-3 flex justify-center"
           >
             <div className="relative w-32 h-32 rounded-lg overflow-hidden shadow-lg border-4 border-white ring-2 ring-indigo-500">
               <img
@@ -210,10 +210,6 @@ export default function Results() {
                     "https://via.placeholder.com/150?text=No+Image";
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-2 text-center text-white text-sm font-medium">
-                SC/{stnum}
-              </div>
             </div>
           </motion.div>
         )}

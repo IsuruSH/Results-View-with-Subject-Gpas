@@ -43,6 +43,7 @@ export default function Results() {
     stnumrank: "",
     gpatype: "gpa",
   });
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const handleSignOut = async () => {
     try {
@@ -56,6 +57,8 @@ export default function Results() {
     e.preventDefault();
     setLoading(true);
     try {
+      const imageUrl = `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`;
+      setProfileImage(imageUrl);
       const response = await fetch(
         `${
           import.meta.env.VITE_SERVER_URL
@@ -190,6 +193,30 @@ export default function Results() {
             </div>
           </motion.div>
         </div>
+        {/* Profile Image Card */}
+        {profileImage && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mt-6 flex justify-center"
+          >
+            <div className="relative w-32 h-32 rounded-lg overflow-hidden shadow-lg border-4 border-white ring-2 ring-indigo-500">
+              <img
+                src={profileImage}
+                alt="Student Profile"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src =
+                    "https://via.placeholder.com/150?text=No+Image";
+                }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-2 text-center text-white text-sm font-medium">
+                SC/{stnum}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         <div className="space-y-8">
           {/* Results Section */}

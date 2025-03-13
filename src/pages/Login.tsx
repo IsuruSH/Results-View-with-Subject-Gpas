@@ -53,7 +53,7 @@ export default function Login() {
             Enter your FOSMIS credentials to access your results
           </p>
           <p className="text-gray-600 mt-2 text-center">
-            FOSMIS එකේ Password හරියට ගහන්න. නැත්නම් වැඩ නැහැ.
+            (FOSMIS එකේ Password හරියට ගහන්න. නැත්නම් වැඩ නැහැ.)
           </p>
         </div>
 

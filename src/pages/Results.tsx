@@ -12,7 +12,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 
 interface GpaFormData {
-  studentNumber: string;
+  stnum: string | number;
   subjects: string[];
   grades: string[];
 }
@@ -32,7 +32,7 @@ export default function Results() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [gpaFormData, setGpaFormData] = useState<GpaFormData>({
-    studentNumber: "",
+    stnum: username || "",
     subjects: [""],
     grades: [""],
   });
@@ -83,6 +83,13 @@ export default function Results() {
     handleSubmit({ preventDefault: () => {} } as React.FormEvent);
   }, []);
 
+  useEffect(() => {
+    setGpaFormData((prev) => ({
+      ...prev,
+      stnum: username || "",
+    }));
+  }, [username]);
+
   const addSubjectField = () => {
     setGpaFormData((prev) => ({
       ...prev,
@@ -102,11 +109,18 @@ export default function Results() {
   const handleGpaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch("http://localhost:4000/calculateGPA", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(gpaFormData),
-      });
+      const response = await fetch(
+        "https://res-proxy.onrender.com/calculateGPA",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("PHPSESSID") || ""}`,
+          },
+          credentials: "include",
+          body: JSON.stringify(gpaFormData),
+        }
+      );
       const data = await response.json();
       setResults(data);
     } catch (error) {
@@ -234,13 +248,6 @@ export default function Results() {
                   >
                     Student Number
                   </label>
-                  <input
-                    type="number"
-                    id="stnum"
-                    value={stnum}
-                    onChange={(e) => setStnum(e.target.value)}
-                    className="hidden mt-1 w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
                 </div>
 
                 <div>
@@ -328,7 +335,7 @@ export default function Results() {
           </motion.div>
 
           {/* GPA Calculator Section */}
-          {/* <motion.div
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
@@ -354,11 +361,11 @@ export default function Results() {
                   <input
                     type="number"
                     id="studentNumber"
-                    value={gpaFormData.studentNumber}
+                    value={stnum}
                     onChange={(e) =>
                       setGpaFormData((prev) => ({
                         ...prev,
-                        studentNumber: e.target.value,
+                        stnum: e.target.value,
                       }))
                     }
                     className="mt-1 hidden w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
@@ -434,7 +441,7 @@ export default function Results() {
                 </motion.button>
               </form>
             </div>
-          </motion.div> */}
+          </motion.div>
 
           {/* Rank Calculator Section */}
           {/* <motion.div

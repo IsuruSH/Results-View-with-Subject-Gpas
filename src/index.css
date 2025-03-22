@@ -16,7 +16,7 @@
 }
 
 .results-container th {
-  @apply px-6 py-4 text-center bg-indigo-600 text-white  text-sm font-semibold uppercase tracking-wider border-b-2 border-indigo-700;
+  @apply px-6 py-4 text-center bg-gray-700 text-white  text-sm font-semibold uppercase tracking-wider border-b-2 border-indigo-700;
 }
 
 .results-container td {

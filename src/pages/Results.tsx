@@ -248,7 +248,7 @@ export default function Results() {
               )}
               <button
                 onClick={handleSignOut}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 "
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign out
@@ -292,7 +292,7 @@ export default function Results() {
                     id="rlevel"
                     value={rlevel}
                     onChange={(e) => setRlevel(e.target.value)}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full  rounded-md shadow-sm   sm:text-sm"
                   >
                     <option value="4">All</option>
                     <option value="1">Level 1</option>
@@ -306,7 +306,7 @@ export default function Results() {
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full flex justify-center py-2 px-4   rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700  disabled:opacity-50"
                 >
                   {loading ? "Loading..." : "Show Results"}
                 </motion.button>
@@ -417,7 +417,7 @@ export default function Results() {
                               },
                             }));
                           }}
-                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          className="mt-1 block w-full  rounded-md shadow-sm  sm:text-sm"
                         />
                       </div>
                       <div className="flex-1">
@@ -438,7 +438,7 @@ export default function Results() {
                               },
                             }));
                           }}
-                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          className="mt-1 block w-full  rounded-md shadow-sm  sm:text-sm"
                         />
                       </div>
                       {index > 0 && (
@@ -457,7 +457,7 @@ export default function Results() {
                     <button
                       type="button"
                       onClick={addSubjectField}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+                      className="inline-flex items-center px-4 py-2   text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Another Subject
@@ -477,7 +477,7 @@ export default function Results() {
                           type="checkbox"
                           checked={includeRepeated}
                           onChange={(e) => setIncludeRepeated(e.target.checked)}
-                          className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                          className="rounded  text-indigo-600 shadow-sm "
                         />
                         <span className="ml-2 text-sm text-gray-600">
                           Include in calculation
@@ -489,7 +489,7 @@ export default function Results() {
                       {repeatedSubjects.map((subject) => (
                         <div
                           key={subject.subjectCode}
-                          className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                          className=" rounded-lg p-4 hover:shadow-md transition-shadow"
                         >
                           <div className="flex flex-col h-full">
                             <div className="flex justify-between items-start">
@@ -525,7 +525,7 @@ export default function Results() {
                                       e.target.value
                                     )
                                   }
-                                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                  className="block w-full  rounded-md shadow-sm sm:text-sm"
                                   disabled={!includeRepeated}
                                 >
                                   {Object.keys(grades).map((grade) => (
@@ -575,7 +575,7 @@ export default function Results() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="w-full flex justify-center py-2 px-4  rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700  "
                 >
                   Calculate GPA
                 </motion.button>

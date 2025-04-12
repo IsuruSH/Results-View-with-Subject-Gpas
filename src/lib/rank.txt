@@ -1,0 +1,153 @@
+ {/* Rank Calculator Section */}
+          {/* <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white shadow sm:rounded-lg"
+          >
+            <div className="px-4 py-5 sm:p-6">
+              <h2 className="text-lg font-medium text-gray-900">
+                Get Student Rank
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Enter the start number and end number of your range to check the
+                rank
+              </p>
+
+              <form onSubmit={handleRankSubmit} className="mt-5 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      htmlFor="startnum"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      Start Number
+                    </label>
+                    <input
+                      type="number"
+                      id="startnum"
+                      value={rankForm.startnum}
+                      onChange={(e) =>
+                        setRankForm((prev) => ({
+                          ...prev,
+                          startnum: e.target.value,
+                        }))
+                      }
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="endnum"
+                      className="block text-sm font-medium text-gray-700"
+                    >
+                      End Number
+                    </label>
+                    <input
+                      type="number"
+                      id="endnum"
+                      value={rankForm.endnum}
+                      onChange={(e) =>
+                        setRankForm((prev) => ({
+                          ...prev,
+                          endnum: e.target.value,
+                        }))
+                      }
+                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="stnumrank"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    Your Student Number
+                  </label>
+                  <input
+                    type="number"
+                    id="stnumrank"
+                    value={rankForm.stnumrank}
+                    onChange={(e) =>
+                      setRankForm((prev) => ({
+                        ...prev,
+                        stnumrank: e.target.value,
+                      }))
+                    }
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="gpatype"
+                    className="block text-sm font-medium text-gray-700"
+                  >
+                    GPA Type
+                  </label>
+                  <select
+                    id="gpatype"
+                    value={rankForm.gpatype}
+                    onChange={(e) =>
+                      setRankForm((prev) => ({
+                        ...prev,
+                        gpatype: e.target.value,
+                      }))
+                    }
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="gpa">Overall GPA</option>
+                    <option value="mathGpa">Math GPA</option>
+                    <option value="cheGpa">Chemistry GPA</option>
+                    <option value="phyGpa">Physics GPA</option>
+                    <option value="zooGpa">Zoology GPA</option>
+                    <option value="botGpa">Botany GPA</option>
+                    <option value="csGpa">Computer Science GPA</option>
+                  </select>
+                </div>
+
+                <p className="text-sm text-red-500">
+                  This result may be delayed due to higher calculations!
+                </p>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="submit"
+                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Calculate Rank
+                </motion.button>
+              </form>
+
+              {rankData && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                >
+                  {Object.entries({
+                    "Total Students": rankData.totalCount,
+                    "Your Rank": rankData.rank,
+                    "Highest GPA": rankData.highestGpa,
+                    "Lowest GPA": rankData.lowestGpa,
+                    "Average GPA": rankData.averageGpa,
+                  }).map(([label, value]) => (
+                    <div key={label} className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="text-sm font-medium text-gray-500">
+                        {label}
+                      </h3>
+                      <p className="mt-1 text-2xl font-semibold text-indigo-600">
+                        {value}
+                      </p>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+          </motion.div> */}

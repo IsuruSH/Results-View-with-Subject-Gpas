@@ -13,8 +13,14 @@ import toast from "react-hot-toast";
 
 interface GpaFormData {
   stnum: string | number;
-  subjects: string[];
-  grades: string[];
+  manualSubjects: {
+    subjects: string[];
+    grades: string[];
+  };
+  repeatedSubjects: {
+    subjects: string[];
+    grades: string[];
+  };
 }
 
 interface RankData {
@@ -25,6 +31,21 @@ interface RankData {
   averageGpa: number;
 }
 
+interface RepeatedSubject {
+  subjectCode: string;
+  subjectName: string;
+  attempts: {
+    grade: string;
+    year: number;
+    isLowGrade: boolean;
+  }[];
+  latestAttempt: {
+    subjectName: string;
+    grade: string;
+    year: number;
+  };
+}
+
 export default function Results() {
   const { signOut, username } = useAuth();
   const [stnum, setStnum] = useState("");
@@ -33,8 +54,14 @@ export default function Results() {
   const [results, setResults] = useState<any>(null);
   const [gpaFormData, setGpaFormData] = useState<GpaFormData>({
     stnum: username || "",
-    subjects: [""],
-    grades: [""],
+    manualSubjects: {
+      subjects: [""],
+      grades: [""],
+    },
+    repeatedSubjects: {
+      subjects: [],
+      grades: [],
+    },
   });
   const [rankData, setRankData] = useState<RankData | null>(null);
   const [rankForm, setRankForm] = useState({
@@ -44,6 +71,13 @@ export default function Results() {
     gpatype: "gpa",
   });
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [repeatedSubjects, setRepeatedSubjects] = useState<RepeatedSubject[]>(
+    []
+  );
+  const [editableGrades, setEditableGrades] = useState<Record<string, string>>(
+    {}
+  );
+  const [includeRepeated, setIncludeRepeated] = useState(true);
 
   const handleSignOut = async () => {
     try {
@@ -72,6 +106,15 @@ export default function Results() {
       );
       const data = await response.json();
       setResults(data);
+
+      if (data.repeatedSubjects) {
+        setRepeatedSubjects(data.repeatedSubjects);
+        const initialGrades: Record<string, string> = {};
+        data.repeatedSubjects.forEach((subject: RepeatedSubject) => {
+          initialGrades[subject.subjectCode] = subject.latestAttempt.grade;
+        });
+        setEditableGrades(initialGrades);
+      }
     } catch (error) {
       toast.error("Error fetching results");
     } finally {
@@ -93,24 +136,68 @@ export default function Results() {
   const addSubjectField = () => {
     setGpaFormData((prev) => ({
       ...prev,
-      subjects: [...prev.subjects, ""],
-      grades: [...prev.grades, ""],
+      manualSubjects: {
+        subjects: [...prev.manualSubjects.subjects, ""],
+        grades: [...prev.manualSubjects.grades, ""],
+      },
     }));
   };
 
   const removeSubjectField = (index: number) => {
     setGpaFormData((prev) => ({
       ...prev,
-      subjects: prev.subjects.filter((_, i) => i !== index),
-      grades: prev.grades.filter((_, i) => i !== index),
+      manualSubjects: {
+        subjects: prev.manualSubjects.subjects.filter((_, i) => i !== index),
+        grades: prev.manualSubjects.grades.filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  const handleGradeChange = (subjectCode: string, grade: string) => {
+    setEditableGrades((prev) => ({
+      ...prev,
+      [subjectCode]: grade,
     }));
   };
 
   const handleGpaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Filter out empty manual entries
+    const filteredManual = {
+      subjects: gpaFormData.manualSubjects.subjects.filter(
+        (s) => s.trim() !== ""
+      ),
+      grades: gpaFormData.manualSubjects.grades.filter(
+        (g, i) =>
+          g.trim() !== "" &&
+          gpaFormData.manualSubjects.subjects[i].trim() !== ""
+      ),
+    };
+
+    // Prepare repeated subjects data if included
+    const filteredRepeated =
+      includeRepeated && repeatedSubjects.length > 0
+        ? {
+            subjects: repeatedSubjects.map((subject) => subject.subjectCode),
+            grades: repeatedSubjects.map(
+              (subject) => editableGrades[subject.subjectCode]
+            ),
+          }
+        : { subjects: [], grades: [] };
+
+    // Check if we have at least one valid entry
+    if (
+      filteredManual.subjects.length === 0 &&
+      filteredRepeated.subjects.length === 0
+    ) {
+      toast.error("Please enter at least one subject and grade");
+      return;
+    }
+
     try {
       const response = await fetch(
-        "https://res-proxy.onrender.com/calculateGPA",
+        `${import.meta.env.VITE_SERVER_URL}/calculateGPA`,
         {
           method: "POST",
           headers: {
@@ -118,26 +205,18 @@ export default function Results() {
             authorization: `Bearer ${localStorage.getItem("PHPSESSID") || ""}`,
           },
           credentials: "include",
-          body: JSON.stringify(gpaFormData),
+          body: JSON.stringify({
+            stnum: username ?? "",
+            manualSubjects: filteredManual,
+            repeatedSubjects: filteredRepeated,
+          }),
         }
       );
       const data = await response.json();
       setResults(data);
+      toast.success("GPA calculated successfully!");
     } catch (error) {
       toast.error("Error calculating GPA");
-    }
-  };
-
-  const handleRankSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const response = await fetch(
-        `http://localhost:5000/calculateRank?startnum=${rankForm.startnum}&endnum=${rankForm.endnum}&stnum=${rankForm.stnumrank}&gpatype=${rankForm.gpatype}`
-      );
-      const data = await response.json();
-      setRankData(data);
-    } catch (error) {
-      toast.error("Error calculating rank");
     }
   };
 
@@ -153,81 +232,33 @@ export default function Results() {
                 Student Results Portal
               </h1>
             </div>
-            <button
-              onClick={handleSignOut}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign out
-            </button>
+            <div className="flex items-center space-x-4">
+              {profileImage && (
+                <div className="relative w-12 h-12 rounded-full overflow-hidden ">
+                  <img
+                    src={profileImage}
+                    alt="Student Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src =
+                        "https://via.placeholder.com/150?text=No+Image";
+                    }}
+                  />
+                </div>
+              )}
+              <button
+                onClick={handleSignOut}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Alerts */}
-        <div className="mb-8 space-y-4">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-yellow-50 border-l-4 border-yellow-400 p-4"
-          >
-            <div className="flex">
-              <AlertCircle className="h-5 w-5 text-yellow-400" />
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700">
-                  Response times may be slower as our server is hosted on a free
-                  platform. Thank you for your patience!
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-blue-50 border-l-4 border-blue-400 p-4"
-          >
-            <div className="flex">
-              <MessageCircle className="h-5 w-5 text-blue-400" />
-              <div className="ml-3">
-                <p className="text-sm text-blue-700">
-                  If you want to remove your results from this system, please
-                  contact me through{" "}
-                  <a
-                    href="https://wa.me/94768324613"
-                    className="text-blue-600 hover:text-blue-800 underline"
-                  >
-                    WhatsApp
-                  </a>
-                  .
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-        {/* Profile Image Card */}
-        {profileImage && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mt-6 mb-3 flex justify-center"
-          >
-            <div className="relative w-32 h-32 rounded-lg overflow-hidden shadow-lg border-4 border-white ring-2 ring-indigo-500">
-              <img
-                src={profileImage}
-                alt="Student Profile"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.src =
-                    "https://via.placeholder.com/150?text=No+Image";
-                }}
-              />
-            </div>
-          </motion.div>
-        )}
-
         <div className="space-y-8">
           {/* Results Section */}
           <motion.div
@@ -339,7 +370,7 @@ export default function Results() {
             </div>
           </motion.div>
 
-          {/* GPA Calculator Section */}
+          {/* Combined GPA Calculator Section */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -348,93 +379,197 @@ export default function Results() {
           >
             <div className="px-4 py-5 sm:p-6">
               <h2 className="text-lg font-medium text-gray-900">
-                Check GPA with Updated Results
+                GPA Calculator
               </h2>
-              <p className="mt-1 text-sm text-red-500">
-                When entering subject codes enter 'a' for 'α', 'b' for 'β', 'd'
-                for 'δ'
+              <p className="mt-1 text-sm text-gray-500">
+                Enter new subjects and/or update repeated subjects to calculate
+                your GPA
               </p>
 
-              <form onSubmit={handleGpaSubmit} className="mt-5 space-y-4">
+              <form onSubmit={handleGpaSubmit} className="mt-5 space-y-6">
+                {/* Manual Subject Entry Section */}
                 <div>
-                  <label
-                    htmlFor="studentNumber"
-                    className="hidden text-sm font-medium text-gray-700"
-                  >
-                    Student Number
-                  </label>
-                  <input
-                    type="number"
-                    id="studentNumber"
-                    value={stnum}
-                    onChange={(e) =>
-                      setGpaFormData((prev) => ({
-                        ...prev,
-                        stnum: e.target.value,
-                      }))
-                    }
-                    className="mt-1 hidden w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
+                  <h3 className="text-md font-medium text-gray-900 mb-3">
+                    Add New Subjects
+                  </h3>
+                  <p className="text-sm text-red-500 mb-3">
+                    When entering subject codes enter 'a' for 'α', 'b' for 'β',
+                    'd' for 'δ'
+                  </p>
 
-                {gpaFormData.subjects.map((subject, index) => (
-                  <div key={index} className="flex gap-4">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        placeholder="Subject Code"
-                        value={subject}
-                        onChange={(e) => {
-                          const newSubjects = [...gpaFormData.subjects];
-                          newSubjects[index] = e.target.value;
-                          setGpaFormData((prev) => ({
-                            ...prev,
-                            subjects: newSubjects,
-                          }));
-                        }}
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        required
-                      />
+                  {gpaFormData.manualSubjects.subjects.map((subject, index) => (
+                    <div key={index} className="flex gap-4 mb-3">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder="Subject Code"
+                          value={subject}
+                          onChange={(e) => {
+                            const newSubjects = [
+                              ...gpaFormData.manualSubjects.subjects,
+                            ];
+                            newSubjects[index] = e.target.value;
+                            setGpaFormData((prev) => ({
+                              ...prev,
+                              manualSubjects: {
+                                ...prev.manualSubjects,
+                                subjects: newSubjects,
+                              },
+                            }));
+                          }}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder="Grade (e.g. A+)"
+                          value={gpaFormData.manualSubjects.grades[index]}
+                          onChange={(e) => {
+                            const newGrades = [
+                              ...gpaFormData.manualSubjects.grades,
+                            ];
+                            newGrades[index] = e.target.value;
+                            setGpaFormData((prev) => ({
+                              ...prev,
+                              manualSubjects: {
+                                ...prev.manualSubjects,
+                                grades: newGrades,
+                              },
+                            }));
+                          }}
+                          className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                      </div>
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => removeSubjectField(index)}
+                          className="mt-1 p-2 text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        placeholder="Grade (e.g. A+)"
-                        value={gpaFormData.grades[index]}
-                        onChange={(e) => {
-                          const newGrades = [...gpaFormData.grades];
-                          newGrades[index] = e.target.value;
-                          setGpaFormData((prev) => ({
-                            ...prev,
-                            grades: newGrades,
-                          }));
-                        }}
-                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        required
-                      />
-                    </div>
-                    {index > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => removeSubjectField(index)}
-                        className="mt-1 p-2 text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    )}
+                  ))}
+
+                  <div>
+                    <button
+                      type="button"
+                      onClick={addSubjectField}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Another Subject
+                    </button>
                   </div>
-                ))}
-
-                <div>
-                  <button
-                    type="button"
-                    onClick={addSubjectField}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Another Subject
-                  </button>
                 </div>
+
+                {/* Repeated Subjects Section */}
+                {repeatedSubjects.length > 0 && (
+                  <div>
+                    <div className="flex items-center mb-3">
+                      <h3 className="text-md font-medium text-gray-900 mr-3">
+                        Update Repeated Subjects
+                      </h3>
+                      <label className="inline-flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={includeRepeated}
+                          onChange={(e) => setIncludeRepeated(e.target.checked)}
+                          className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                        />
+                        <span className="ml-2 text-sm text-gray-600">
+                          Include in calculation
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {repeatedSubjects.map((subject) => (
+                        <div
+                          key={subject.subjectCode}
+                          className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex flex-col h-full">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="text-md font-medium text-gray-900">
+                                  {subject.subjectName} ({subject.subjectCode})
+                                </h4>
+                                <div className="mt-1 text-sm text-gray-500">
+                                  <p>Attempts:</p>
+                                  <ul className="list-disc pl-5">
+                                    {subject.attempts.map((attempt, index) => (
+                                      <li key={index}>
+                                        {attempt.grade} ({attempt.year}){" "}
+                                        {attempt.isLowGrade && (
+                                          <span className="text-red-500">
+                                            (Low Grade)
+                                          </span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2 mt-2">
+                                <select
+                                  value={
+                                    editableGrades[subject.subjectCode] ||
+                                    subject.latestAttempt.grade
+                                  }
+                                  onChange={(e) =>
+                                    handleGradeChange(
+                                      subject.subjectCode,
+                                      e.target.value
+                                    )
+                                  }
+                                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                  disabled={!includeRepeated}
+                                >
+                                  {Object.keys(grades).map((grade) => (
+                                    <option key={grade} value={grade}>
+                                      {grade}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            {subject.attempts.length > 1 && (
+                              <div className="mt-auto pt-2">
+                                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                  <div
+                                    className="bg-indigo-600 h-2.5 rounded-full"
+                                    style={{
+                                      width: `${
+                                        (grades[
+                                          editableGrades[subject.subjectCode] ||
+                                            subject.latestAttempt.grade
+                                        ] /
+                                          4) *
+                                        100
+                                      }%`,
+                                    }}
+                                  ></div>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Current Grade Value:{" "}
+                                  {
+                                    grades[
+                                      editableGrades[subject.subjectCode] ||
+                                        subject.latestAttempt.grade
+                                    ]
+                                  }
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -447,160 +582,47 @@ export default function Results() {
               </form>
             </div>
           </motion.div>
-
-          {/* Rank Calculator Section */}
-          {/* <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white shadow sm:rounded-lg"
+        </div>
+        {/* Alerts */}
+        <div className=" space-y-4 mt-10">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-yellow-50 border-l-4 border-yellow-400 p-4"
           >
-            <div className="px-4 py-5 sm:p-6">
-              <h2 className="text-lg font-medium text-gray-900">
-                Get Student Rank
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Enter the start number and end number of your range to check the
-                rank
-              </p>
-
-              <form onSubmit={handleRankSubmit} className="mt-5 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label
-                      htmlFor="startnum"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      Start Number
-                    </label>
-                    <input
-                      type="number"
-                      id="startnum"
-                      value={rankForm.startnum}
-                      onChange={(e) =>
-                        setRankForm((prev) => ({
-                          ...prev,
-                          startnum: e.target.value,
-                        }))
-                      }
-                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="endnum"
-                      className="block text-sm font-medium text-gray-700"
-                    >
-                      End Number
-                    </label>
-                    <input
-                      type="number"
-                      id="endnum"
-                      value={rankForm.endnum}
-                      onChange={(e) =>
-                        setRankForm((prev) => ({
-                          ...prev,
-                          endnum: e.target.value,
-                        }))
-                      }
-                      className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="stnumrank"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Your Student Number
-                  </label>
-                  <input
-                    type="number"
-                    id="stnumrank"
-                    value={rankForm.stnumrank}
-                    onChange={(e) =>
-                      setRankForm((prev) => ({
-                        ...prev,
-                        stnumrank: e.target.value,
-                      }))
-                    }
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="gpatype"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    GPA Type
-                  </label>
-                  <select
-                    id="gpatype"
-                    value={rankForm.gpatype}
-                    onChange={(e) =>
-                      setRankForm((prev) => ({
-                        ...prev,
-                        gpatype: e.target.value,
-                      }))
-                    }
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  >
-                    <option value="gpa">Overall GPA</option>
-                    <option value="mathGpa">Math GPA</option>
-                    <option value="cheGpa">Chemistry GPA</option>
-                    <option value="phyGpa">Physics GPA</option>
-                    <option value="zooGpa">Zoology GPA</option>
-                    <option value="botGpa">Botany GPA</option>
-                    <option value="csGpa">Computer Science GPA</option>
-                  </select>
-                </div>
-
-                <p className="text-sm text-red-500">
-                  This result may be delayed due to higher calculations!
+            <div className="flex">
+              <AlertCircle className="h-5 w-5 text-yellow-400" />
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  Response times may be slower as our server is hosted on a free
+                  platform. Thank you for your patience!
                 </p>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Calculate Rank
-                </motion.button>
-              </form>
-
-              {rankData && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                >
-                  {Object.entries({
-                    "Total Students": rankData.totalCount,
-                    "Your Rank": rankData.rank,
-                    "Highest GPA": rankData.highestGpa,
-                    "Lowest GPA": rankData.lowestGpa,
-                    "Average GPA": rankData.averageGpa,
-                  }).map(([label, value]) => (
-                    <div key={label} className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="text-sm font-medium text-gray-500">
-                        {label}
-                      </h3>
-                      <p className="mt-1 text-2xl font-semibold text-indigo-600">
-                        {value}
-                      </p>
-                    </div>
-                  ))}
-                </motion.div>
-              )}
+              </div>
             </div>
-          </motion.div> */}
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-blue-50 border-l-4 border-blue-400 p-4 "
+          >
+            <div className="flex">
+              <MessageCircle className="h-5 w-5 text-blue-400" />
+              <div className="ml-3">
+                <p className="text-sm text-blue-700">
+                  If you want to remove your results from this system, please
+                  contact me through{" "}
+                  <a
+                    href="https://wa.me/94768324613"
+                    className="text-blue-600 hover:text-blue-800 underline"
+                  >
+                    WhatsApp.
+                  </a>
+                </p>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </main>
 
@@ -615,3 +637,23 @@ export default function Results() {
     </div>
   );
 }
+
+const grades = {
+  "A+": 4.0,
+  A: 4.0,
+  "A-": 3.7,
+  "B+": 3.3,
+  B: 3.0,
+  "B-": 2.7,
+  "C+": 2.3,
+  C: 2.0,
+  "C-": 1.7,
+  "D+": 1.3,
+  D: 1.0,
+  E: 0.0,
+  "E*": 0.0,
+  "E+": 0.0,
+  "E-": 0.0,
+  F: 0.0,
+  MC: 0.0,
+};

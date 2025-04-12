@@ -385,6 +385,22 @@ export default function Results() {
                 Enter new subjects and/or update repeated subjects to calculate
                 your GPA
               </p>
+              <ol className="list-decimal pl-5 text-sm text-gray-500 mt-2 font-bold">
+                <li>
+                  FOSMIS එකේ නැති Results තියෙනවනම් Add New Subjects වල Sbuject
+                  code & results add කරලා බලන්න.
+                </li>
+                <li>
+                  FOSMIS එකේ නැති subjects සහ repeated & MC subjects වල results
+                  වෙනස් කරලා GPA එක බලන්න ඕන නම් "include in calculation" tick
+                  එක දාල results වෙනස් කරලා බලන්න
+                </li>
+                <li>
+                  Repeated & MC sbujects වල results විතරක් වෙනස් කරලා GPA එක
+                  බලන්න ඕන නම් "include in calculation" tick එක දාල results
+                  change කරලා "Calculatte GPA " button එක click කරන්න{" "}
+                </li>
+              </ol>
 
               <form onSubmit={handleGpaSubmit} className="mt-5 space-y-6">
                 {/* Manual Subject Entry Section */}

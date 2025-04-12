@@ -505,7 +505,7 @@ export default function Results() {
                       {repeatedSubjects.map((subject) => (
                         <div
                           key={subject.subjectCode}
-                          className=" rounded-lg p-4 hover:shadow-md transition-shadow"
+                          className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                         >
                           <div className="flex flex-col h-full">
                             <div className="flex justify-between items-start">

@@ -1,15 +1,18 @@
+import React from "react";
 import { GraduationCap, LogOut } from "lucide-react";
 
 interface DashboardHeaderProps {
   username: string | null;
   profileImage: string | null;
   onSignOut: () => void;
+  actions?: React.ReactNode;
 }
 
 export default function DashboardHeader({
   username,
   profileImage,
   onSignOut,
+  actions,
 }: DashboardHeaderProps) {
   return (
     <header className="bg-gradient-to-r from-indigo-700 to-indigo-800 shadow-lg">
@@ -53,6 +56,8 @@ export default function DashboardHeader({
                 />
               </div>
             )}
+
+            {actions}
 
             <button
               onClick={onSignOut}

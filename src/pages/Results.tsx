@@ -6,12 +6,26 @@ import toast from "react-hot-toast";
 import { fetchResults, calculateGPA } from "../services/api";
 import type { GpaFormData, GpaResults, RepeatedSubject } from "../types";
 
+// Layout
 import DashboardHeader from "../components/dashboard/DashboardHeader";
+import DashboardFooter from "../components/dashboard/DashboardFooter";
+
+// Existing sections
 import GpaOverview from "../components/dashboard/GpaOverview";
 import ResultsTable from "../components/dashboard/ResultsTable";
 import GpaCalculator from "../components/dashboard/GpaCalculator";
 import RepeatedSubjects from "../components/dashboard/RepeatedSubjects";
-import DashboardFooter from "../components/dashboard/DashboardFooter";
+
+// New analytics & planning
+import ClassPredictor from "../components/dashboard/ClassPredictor";
+import CreditProgress from "../components/dashboard/CreditProgress";
+import GpaTrendChart from "../components/dashboard/GpaTrendChart";
+import GradeDistribution from "../components/dashboard/GradeDistribution";
+import DepartmentRadar from "../components/dashboard/DepartmentRadar";
+import AnalyticsTabs from "../components/dashboard/AnalyticsTabs";
+import WhatIfSimulator from "../components/dashboard/WhatIfSimulator";
+import GpaTargetPlanner from "../components/dashboard/GpaTargetPlanner";
+import PdfExport from "../components/dashboard/PdfExport";
 
 export default function Results() {
   const { signOut, username, session } = useAuth();
@@ -31,7 +45,9 @@ export default function Results() {
     Record<string, string>
   >({});
   const [includeRepeated, setIncludeRepeated] = useState(true);
+
   const gpaOverviewRef = useRef<HTMLDivElement>(null);
+  const pdfContentRef = useRef<HTMLDivElement>(null);
 
   const handleSignOut = async () => {
     try {
@@ -67,7 +83,6 @@ export default function Results() {
     }
   }, [username, session, rlevel]);
 
-  // Fetch results on initial mount and whenever rlevel changes
   useEffect(() => {
     loadResults();
   }, [loadResults]);
@@ -121,9 +136,11 @@ export default function Results() {
       );
       setResults(data);
       toast.success("GPA calculated successfully!");
-      // Scroll to GPA overview after a short delay so the DOM updates
       setTimeout(() => {
-        gpaOverviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        gpaOverviewRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
       }, 100);
     } catch {
       toast.error("Error calculating GPA");
@@ -136,10 +153,15 @@ export default function Results() {
         username={username}
         profileImage={profileImage}
         onSignOut={handleSignOut}
+        actions={
+          <PdfExport
+            contentRef={pdfContentRef as React.RefObject<HTMLDivElement>}
+            username={username}
+          />
+        }
       />
 
       <main className="flex-1 max-w-7xl mx-auto w-full py-6 px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Rest in Peace special message */}
         {results?.message === "Rest in Peace" ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -156,9 +178,40 @@ export default function Results() {
           </motion.div>
         ) : (
           <>
-            {/* GPA Overview - visual hero */}
-            <div ref={gpaOverviewRef}>
-              {results && <GpaOverview results={results} />}
+            {/* PDF-capturable section */}
+            <div ref={pdfContentRef} className="space-y-6">
+              {/* Class Predictor banner */}
+              {results && <ClassPredictor gpa={results.gpa} />}
+
+              {/* GPA Overview gauges */}
+              <div ref={gpaOverviewRef}>
+                {results && <GpaOverview results={results} />}
+              </div>
+
+              {/* Credit Progress */}
+              {results && (
+                <CreditProgress totalCredits={results.totalCredits} />
+              )}
+
+              {/* Analytics Grid */}
+              {results && (
+                <div
+                  className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+                  style={{ contentVisibility: "auto" }}
+                >
+                  <GpaTrendChart levelGpas={results.levelGpas} />
+                  <GradeDistribution
+                    distribution={results.gradeDistribution}
+                  />
+                </div>
+              )}
+
+              {/* Department Radar - full width */}
+              {results && (
+                <div style={{ contentVisibility: "auto" }}>
+                  <DepartmentRadar results={results} />
+                </div>
+              )}
             </div>
 
             {/* Results Table */}
@@ -170,11 +223,27 @@ export default function Results() {
               loading={loading}
             />
 
-            {/* GPA Calculator */}
-            <GpaCalculator
-              gpaFormData={gpaFormData}
-              setGpaFormData={setGpaFormData}
-              onSubmit={handleGpaSubmit}
+            {/* Tabbed: Calculator / What-If / Target Planner */}
+            <AnalyticsTabs
+              calculatorContent={
+                <GpaCalculator
+                  gpaFormData={gpaFormData}
+                  setGpaFormData={setGpaFormData}
+                  onSubmit={handleGpaSubmit}
+                />
+              }
+              whatIfContent={
+                <WhatIfSimulator
+                  totalCredits={results?.totalCredits}
+                  totalGradePoints={results?.totalGradePoints}
+                />
+              }
+              targetContent={
+                <GpaTargetPlanner
+                  totalCredits={results?.totalCredits}
+                  totalGradePoints={results?.totalGradePoints}
+                />
+              }
             />
 
             {/* Repeated Subjects */}

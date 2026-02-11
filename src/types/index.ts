@@ -44,6 +44,10 @@ export interface GpaResults {
   zooGpa?: string;
   botGpa?: string;
   csGpa?: string;
+  gradeDistribution?: Record<string, number>;
+  levelGpas?: { level1?: string; level2?: string; level3?: string };
+  totalCredits?: number;
+  totalGradePoints?: number;
 }
 
 export interface AuthContextType {

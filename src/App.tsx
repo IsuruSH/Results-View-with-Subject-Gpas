@@ -1,17 +1,9 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import Login from "./pages/Login";
 import Results from "./pages/Results";
-import { AuthProvider, useAuth } from "./context/AuthContext";
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session } = useAuth();
-  if (!session) {
-    return <Navigate to="/login" replace />;
-  }
-  return <>{children}</>;
-}
+import ProtectedRoute from "./components/ProtectedRoute";
+import { AuthProvider } from "./context/AuthContext";
 
 function App() {
   return (

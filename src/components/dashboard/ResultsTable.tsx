@@ -25,32 +25,83 @@ const LEVEL_LABELS: Record<string, string> = {
 
 interface ParsedRow {
   code: string;
-  name: string;
-  grade: string;
   year: string;
   rawHtml: string;
 }
 
-/** Try to extract structured rows from FOSMIS HTML for grouping. */
+/**
+ * Parse ALL table body rows (trbgc + selectbg) in their original DOM order.
+ *
+ * Grouping logic: a "subject block" is a trbgc row followed by zero or more
+ * selectbg (repeat) rows. FOSMIS puts the most recent attempt as the trbgc
+ * row, but the subject should be grouped under the EARLIEST attempt year.
+ * We therefore scan all years in the block and assign every row to the
+ * minimum year found.
+ */
 function parseRows(html: string): ParsedRow[] | null {
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
-    const rows = doc.querySelectorAll("tr.trbgc");
-    if (rows.length === 0) return null;
+    const allRows = doc.querySelectorAll("tr.trbgc, tr.selectbg");
+    if (allRows.length === 0) return null;
 
-    const parsed: ParsedRow[] = [];
-    rows.forEach((tr) => {
+    // --- Step 1: collect subject blocks (trbgc + trailing selectbg rows) ---
+    interface BlockRow {
+      code: string;
+      year: string;
+      rawHtml: string;
+    }
+    type Block = BlockRow[];
+
+    const blocks: Block[] = [];
+    let current: Block | null = null;
+
+    allRows.forEach((tr) => {
+      const isRepeat = tr.classList.contains("selectbg");
       const tds = tr.querySelectorAll("td");
-      if (tds.length < 4) return;
-      parsed.push({
-        code: tds[0].textContent?.trim() ?? "",
-        name: tds[1].textContent?.trim() ?? "",
-        grade: tds[2].textContent?.trim() ?? "",
-        year: tds[3].textContent?.trim() ?? "",
-        rawHtml: (tr as HTMLElement).outerHTML,
-      });
+
+      if (!isRepeat && tds.length >= 4) {
+        // New subject block starts with a regular row
+        current = [];
+        blocks.push(current);
+        current.push({
+          code: tds[0].textContent?.trim() ?? "",
+          year: tds[3].textContent?.trim() ?? "",
+          rawHtml: (tr as HTMLElement).outerHTML,
+        });
+      } else if (isRepeat && current) {
+        // Repeat row — belongs to the current block
+        // selectbg has 3 tds: [0]=repeat text (colspan=2), [1]=grade, [2]=year
+        const year = tds.length >= 3 ? (tds[2].textContent?.trim() ?? "") : "";
+        current.push({
+          code: tds[0].textContent?.trim() ?? "",
+          year,
+          rawHtml: (tr as HTMLElement).outerHTML,
+        });
+      }
     });
+
+    // --- Step 2: assign every row in a block to the earliest year ---
+    const parsed: ParsedRow[] = [];
+
+    for (const block of blocks) {
+      // Find the minimum (earliest) year across all rows in this block
+      let earliest = "";
+      for (const row of block) {
+        if (row.year && (!earliest || row.year < earliest)) {
+          earliest = row.year;
+        }
+      }
+
+      for (const row of block) {
+        parsed.push({
+          code: row.code,
+          year: earliest || row.year,
+          rawHtml: row.rawHtml,
+        });
+      }
+    }
+
     return parsed.length > 0 ? parsed : null;
   } catch {
     return null;
@@ -87,7 +138,9 @@ export default function ResultsTable({
 
   const rowCount = useMemo(() => {
     if (!html) return 0;
-    return (html.match(/<tr[^>]*class="trbgc"/gi) || []).length;
+    const regular = (html.match(/<tr[^>]*class="trbgc"/gi) || []).length;
+    const repeats = (html.match(/<tr[^>]*class="selectbg"/gi) || []).length;
+    return regular + repeats;
   }, [html]);
 
   // Parse rows and group by year

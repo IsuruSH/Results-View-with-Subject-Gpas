@@ -25,7 +25,7 @@ import DepartmentRadar from "../components/dashboard/DepartmentRadar";
 import AnalyticsTabs from "../components/dashboard/AnalyticsTabs";
 import WhatIfSimulator from "../components/dashboard/WhatIfSimulator";
 import GpaTargetPlanner from "../components/dashboard/GpaTargetPlanner";
-import PdfExport from "../components/dashboard/PdfExport";
+import ExcelExport from "../components/dashboard/ExcelExport";
 
 export default function Results() {
   const { signOut, username, session } = useAuth();
@@ -47,7 +47,6 @@ export default function Results() {
   const [includeRepeated, setIncludeRepeated] = useState(true);
 
   const gpaOverviewRef = useRef<HTMLDivElement>(null);
-  const pdfContentRef = useRef<HTMLDivElement>(null);
 
   const handleSignOut = async () => {
     try {
@@ -154,9 +153,10 @@ export default function Results() {
         profileImage={profileImage}
         onSignOut={handleSignOut}
         actions={
-          <PdfExport
-            contentRef={pdfContentRef as React.RefObject<HTMLDivElement>}
+          <ExcelExport
+            subjectBreakdown={results?.subjectBreakdown}
             username={username}
+            gpa={results?.gpa}
           />
         }
       />
@@ -178,41 +178,38 @@ export default function Results() {
           </motion.div>
         ) : (
           <>
-            {/* PDF-capturable section */}
-            <div ref={pdfContentRef} className="space-y-6">
-              {/* Class Predictor banner */}
-              {results && <ClassPredictor gpa={results.gpa} />}
+            {/* Class Predictor banner */}
+            {results && <ClassPredictor gpa={results.gpa} />}
 
-              {/* GPA Overview gauges */}
-              <div ref={gpaOverviewRef}>
-                {results && <GpaOverview results={results} />}
-              </div>
-
-              {/* Credit Progress */}
-              {results && (
-                <CreditProgress totalCredits={results.totalCredits} />
-              )}
-
-              {/* Analytics Grid */}
-              {results && (
-                <div
-                  className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-                  style={{ contentVisibility: "auto" }}
-                >
-                  <GpaTrendChart levelGpas={results.levelGpas} />
-                  <GradeDistribution
-                    distribution={results.gradeDistribution}
-                  />
-                </div>
-              )}
-
-              {/* Department Radar - full width */}
-              {results && (
-                <div style={{ contentVisibility: "auto" }}>
-                  <DepartmentRadar results={results} />
-                </div>
-              )}
+            {/* GPA Overview gauges */}
+            <div ref={gpaOverviewRef}>
+              {results && <GpaOverview results={results} />}
             </div>
+
+            {/* Credit Progress */}
+            {results && (
+              <CreditProgress totalCredits={results.totalCredits} />
+            )}
+
+            {/* Analytics Grid */}
+            {results && (
+              <div
+                className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+                style={{ contentVisibility: "auto" }}
+              >
+                <GpaTrendChart levelGpas={results.levelGpas} />
+                <GradeDistribution
+                  distribution={results.gradeDistribution}
+                />
+              </div>
+            )}
+
+            {/* Department Radar - full width */}
+            {results && (
+              <div style={{ contentVisibility: "auto" }}>
+                <DepartmentRadar results={results} />
+              </div>
+            )}
 
             {/* Results Table */}
             <ResultsTable

@@ -33,10 +33,22 @@ export interface RepeatedSubject {
   };
 }
 
+export interface SubjectBreakdownRow {
+  subjectCode: string;
+  subjectName: string;
+  grade: string;
+  credit: number;
+  gradeScale: number;
+  weightedPoints: number;
+  year: number;
+  semester: string;
+}
+
 export interface GpaResults {
   data?: string;
   message?: string;
   repeatedSubjects?: RepeatedSubject[];
+  subjectBreakdown?: SubjectBreakdownRow[];
   gpa?: string;
   mathGpa?: string;
   cheGpa?: string;

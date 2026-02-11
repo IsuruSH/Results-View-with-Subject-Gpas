@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   LogOut,
@@ -11,64 +11,19 @@ import {
 import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 
-interface GpaFormData {
-  stnum: string | number;
-  manualSubjects: {
-    subjects: string[];
-    grades: string[];
-  };
-  repeatedSubjects: {
-    subjects: string[];
-    grades: string[];
-  };
-}
-
-interface RankData {
-  totalCount: number;
-  rank: number;
-  highestGpa: number;
-  lowestGpa: number;
-  averageGpa: number;
-}
-
-interface RepeatedSubject {
-  subjectCode: string;
-  subjectName: string;
-  attempts: {
-    grade: string;
-    year: number;
-    isLowGrade: boolean;
-  }[];
-  latestAttempt: {
-    subjectName: string;
-    grade: string;
-    year: number;
-  };
-}
+import { fetchResults, calculateGPA } from "../services/api";
+import { GRADE_SCALE, GRADE_OPTIONS, GPA_LABELS } from "../constants/grades";
+import type { GpaFormData, GpaResults, RepeatedSubject } from "../types";
 
 export default function Results() {
-  const { signOut, username } = useAuth();
-  const [stnum, setStnum] = useState("");
+  const { signOut, username, session } = useAuth();
   const [rlevel, setRlevel] = useState("4");
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<GpaResults | null>(null);
   const [gpaFormData, setGpaFormData] = useState<GpaFormData>({
     stnum: username || "",
-    manualSubjects: {
-      subjects: [""],
-      grades: [""],
-    },
-    repeatedSubjects: {
-      subjects: [],
-      grades: [],
-    },
-  });
-  const [rankData, setRankData] = useState<RankData | null>(null);
-  const [rankForm, setRankForm] = useState({
-    startnum: "",
-    endnum: "",
-    stnumrank: "",
-    gpatype: "gpa",
+    manualSubjects: { subjects: [""], grades: [""] },
+    repeatedSubjects: { subjects: [], grades: [] },
   });
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [repeatedSubjects, setRepeatedSubjects] = useState<RepeatedSubject[]>(
@@ -82,29 +37,22 @@ export default function Results() {
   const handleSignOut = async () => {
     try {
       await signOut();
-    } catch (error) {
+    } catch {
       toast.error("Error signing out");
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Core fetch logic extracted so it can be called from both the form and
+  // the initial-load effect without needing a synthetic event.
+  const loadResults = useCallback(async () => {
+    if (!username || !session) return;
     setLoading(true);
     try {
-      const imageUrl = `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`;
-      setProfileImage(imageUrl);
-      const response = await fetch(
-        `${
-          import.meta.env.VITE_SERVER_URL
-        }/results?stnum=${username}&rlevel=${rlevel}`,
-        {
-          headers: {
-            authorization: localStorage.getItem("PHPSESSID") || "",
-          },
-          credentials: "include",
-        }
+      setProfileImage(
+        `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
       );
-      const data = await response.json();
+
+      const data = await fetchResults(session, username, rlevel);
       setResults(data);
 
       if (data.repeatedSubjects) {
@@ -115,22 +63,26 @@ export default function Results() {
         });
         setEditableGrades(initialGrades);
       }
-    } catch (error) {
+    } catch {
       toast.error("Error fetching results");
     } finally {
       setLoading(false);
     }
+  }, [username, session, rlevel]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await loadResults();
   };
 
+  // Fetch results on initial mount
   useEffect(() => {
-    handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+    loadResults();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    setGpaFormData((prev) => ({
-      ...prev,
-      stnum: username || "",
-    }));
+    setGpaFormData((prev) => ({ ...prev, stnum: username || "" }));
   }, [username]);
 
   const addSubjectField = () => {
@@ -154,16 +106,12 @@ export default function Results() {
   };
 
   const handleGradeChange = (subjectCode: string, grade: string) => {
-    setEditableGrades((prev) => ({
-      ...prev,
-      [subjectCode]: grade,
-    }));
+    setEditableGrades((prev) => ({ ...prev, [subjectCode]: grade }));
   };
 
   const handleGpaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Filter out empty manual entries
     const filteredManual = {
       subjects: gpaFormData.manualSubjects.subjects.filter(
         (s) => s.trim() !== ""
@@ -175,18 +123,16 @@ export default function Results() {
       ),
     };
 
-    // Prepare repeated subjects data if included
     const filteredRepeated =
       includeRepeated && repeatedSubjects.length > 0
         ? {
-            subjects: repeatedSubjects.map((subject) => subject.subjectCode),
+            subjects: repeatedSubjects.map((s) => s.subjectCode),
             grades: repeatedSubjects.map(
-              (subject) => editableGrades[subject.subjectCode]
+              (s) => editableGrades[s.subjectCode]
             ),
           }
         : { subjects: [], grades: [] };
 
-    // Check if we have at least one valid entry
     if (
       filteredManual.subjects.length === 0 &&
       filteredRepeated.subjects.length === 0
@@ -196,26 +142,15 @@ export default function Results() {
     }
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SERVER_URL}/calculateGPA`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            authorization: `Bearer ${localStorage.getItem("PHPSESSID") || ""}`,
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            stnum: username ?? "",
-            manualSubjects: filteredManual,
-            repeatedSubjects: filteredRepeated,
-          }),
-        }
+      const data = await calculateGPA(
+        session || "",
+        username ?? "",
+        filteredManual,
+        filteredRepeated
       );
-      const data = await response.json();
       setResults(data);
       toast.success("GPA calculated successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Error calculating GPA");
     }
   };
@@ -234,7 +169,7 @@ export default function Results() {
             </div>
             <div className="flex items-center space-x-4">
               {profileImage && (
-                <div className="relative w-12 h-12 rounded-full overflow-hidden ">
+                <div className="relative w-12 h-12 rounded-full overflow-hidden">
                   <img
                     src={profileImage}
                     alt="Student Profile"
@@ -248,7 +183,7 @@ export default function Results() {
               )}
               <button
                 onClick={handleSignOut}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 "
+                className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Sign out
@@ -274,15 +209,6 @@ export default function Results() {
               <form onSubmit={handleSubmit} className="mt-5 space-y-4">
                 <div>
                   <label
-                    htmlFor="stnum"
-                    className="hidden  text-sm font-medium text-gray-700"
-                  >
-                    Student Number
-                  </label>
-                </div>
-
-                <div>
-                  <label
                     htmlFor="rlevel"
                     className="block text-sm font-medium text-gray-700"
                   >
@@ -292,7 +218,7 @@ export default function Results() {
                     id="rlevel"
                     value={rlevel}
                     onChange={(e) => setRlevel(e.target.value)}
-                    className="mt-1 block w-full  rounded-md shadow-sm   sm:text-sm"
+                    className="mt-1 block w-full rounded-md shadow-sm sm:text-sm"
                   >
                     <option value="4">All</option>
                     <option value="1">Level 1</option>
@@ -306,7 +232,7 @@ export default function Results() {
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center py-2 px-4   rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700  disabled:opacity-50"
+                  className="w-full flex justify-center py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {loading ? "Loading..." : "Show Results"}
                 </motion.button>
@@ -332,36 +258,31 @@ export default function Results() {
                     <>
                       <div className="results-container">
                         <div
-                          dangerouslySetInnerHTML={{ __html: results.data }}
+                          dangerouslySetInnerHTML={{
+                            __html: results.data || "",
+                          }}
                         />
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {Object.entries({
-                          "Overall GPA": results.gpa,
-                          "Math GPA": results.mathGpa,
-                          "Chemistry GPA": results.cheGpa,
-                          "Physics GPA": results.phyGpa,
-                          "Zoology GPA": results.zooGpa,
-                          "Botany GPA": results.botGpa,
-                          "Computer Science GPA": results.csGpa,
-                        }).map(
-                          ([label, value]) =>
-                            value &&
-                            !isNaN(Number(value)) && (
-                              <div
-                                key={label}
-                                className="bg-gray-50 p-4 rounded-lg"
-                              >
-                                <h3 className="text-sm font-medium text-gray-500">
-                                  {label}
-                                </h3>
-                                <p className="mt-1 text-2xl font-semibold text-indigo-600">
-                                  {value}
-                                </p>
-                              </div>
-                            )
-                        )}
+                        {Object.entries(GPA_LABELS).map(([key, label]) => {
+                          const value =
+                            results[key as keyof GpaResults] as string;
+                          if (!value || isNaN(Number(value))) return null;
+                          return (
+                            <div
+                              key={key}
+                              className="bg-gray-50 p-4 rounded-lg"
+                            >
+                              <h3 className="text-sm font-medium text-gray-500">
+                                {label}
+                              </h3>
+                              <p className="mt-1 text-2xl font-semibold text-indigo-600">
+                                {value}
+                              </p>
+                            </div>
+                          );
+                        })}
                       </div>
                     </>
                   )}
@@ -370,7 +291,7 @@ export default function Results() {
             </div>
           </motion.div>
 
-          {/* Combined GPA Calculator Section */}
+          {/* GPA Calculator Section */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -403,7 +324,7 @@ export default function Results() {
               </ol>
 
               <form onSubmit={handleGpaSubmit} className="mt-5 space-y-6">
-                {/* Manual Subject Entry Section */}
+                {/* Manual Subject Entry */}
                 <div>
                   <h3 className="text-md font-medium text-gray-900 mb-3">
                     Add New Subjects
@@ -433,7 +354,7 @@ export default function Results() {
                               },
                             }));
                           }}
-                          className="mt-1 block w-full  rounded-md shadow-sm  sm:text-sm"
+                          className="mt-1 block w-full rounded-md shadow-sm sm:text-sm"
                         />
                       </div>
                       <div className="flex-1">
@@ -454,7 +375,7 @@ export default function Results() {
                               },
                             }));
                           }}
-                          className="mt-1 block w-full  rounded-md shadow-sm  sm:text-sm"
+                          className="mt-1 block w-full rounded-md shadow-sm sm:text-sm"
                         />
                       </div>
                       {index > 0 && (
@@ -473,7 +394,7 @@ export default function Results() {
                     <button
                       type="button"
                       onClick={addSubjectField}
-                      className="inline-flex items-center px-4 py-2   text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+                      className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Another Subject
@@ -481,7 +402,7 @@ export default function Results() {
                   </div>
                 </div>
 
-                {/* Repeated Subjects Section */}
+                {/* Repeated Subjects */}
                 {repeatedSubjects.length > 0 && (
                   <div>
                     <div className="flex items-center mb-3">
@@ -493,7 +414,7 @@ export default function Results() {
                           type="checkbox"
                           checked={includeRepeated}
                           onChange={(e) => setIncludeRepeated(e.target.checked)}
-                          className="rounded  text-indigo-600 shadow-sm "
+                          className="rounded text-indigo-600 shadow-sm"
                         />
                         <span className="ml-2 text-sm text-gray-600">
                           Include in calculation
@@ -541,10 +462,10 @@ export default function Results() {
                                       e.target.value
                                     )
                                   }
-                                  className="block w-full  rounded-md shadow-sm sm:text-sm"
+                                  className="block w-full rounded-md shadow-sm sm:text-sm"
                                   disabled={!includeRepeated}
                                 >
-                                  {Object.keys(grades).map((grade) => (
+                                  {GRADE_OPTIONS.map((grade) => (
                                     <option key={grade} value={grade}>
                                       {grade}
                                     </option>
@@ -559,10 +480,11 @@ export default function Results() {
                                     className="bg-indigo-600 h-2.5 rounded-full"
                                     style={{
                                       width: `${
-                                        (grades[
-                                          editableGrades[subject.subjectCode] ||
-                                            subject.latestAttempt.grade
-                                        ] /
+                                        ((GRADE_SCALE[
+                                          editableGrades[
+                                            subject.subjectCode
+                                          ] || subject.latestAttempt.grade
+                                        ] ?? 0) /
                                           4) *
                                         100
                                       }%`,
@@ -571,12 +493,10 @@ export default function Results() {
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">
                                   Current Grade Value:{" "}
-                                  {
-                                    grades[
-                                      editableGrades[subject.subjectCode] ||
-                                        subject.latestAttempt.grade
-                                    ]
-                                  }
+                                  {GRADE_SCALE[
+                                    editableGrades[subject.subjectCode] ||
+                                      subject.latestAttempt.grade
+                                  ] ?? 0}
                                 </p>
                               </div>
                             )}
@@ -591,7 +511,7 @@ export default function Results() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
-                  className="w-full flex justify-center py-2 px-4  rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700  "
+                  className="w-full flex justify-center py-2 px-4 rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
                 >
                   Calculate GPA
                 </motion.button>
@@ -599,8 +519,9 @@ export default function Results() {
             </div>
           </motion.div>
         </div>
+
         {/* Alerts */}
-        <div className=" space-y-4 mt-10">
+        <div className="space-y-4 mt-10">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -621,7 +542,7 @@ export default function Results() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-blue-50 border-l-4 border-blue-400 p-4 "
+            className="bg-blue-50 border-l-4 border-blue-400 p-4"
           >
             <div className="flex">
               <MessageCircle className="h-5 w-5 text-blue-400" />
@@ -653,23 +574,3 @@ export default function Results() {
     </div>
   );
 }
-
-const grades = {
-  "A+": 4.0,
-  A: 4.0,
-  "A-": 3.7,
-  "B+": 3.3,
-  B: 3.0,
-  "B-": 2.7,
-  "C+": 2.3,
-  C: 2.0,
-  "C-": 1.7,
-  "D+": 1.3,
-  D: 1.0,
-  E: 0.0,
-  "E*": 0.0,
-  "E+": 0.0,
-  "E-": 0.0,
-  F: 0.0,
-  MC: 0.0,
-};

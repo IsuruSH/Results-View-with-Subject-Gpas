@@ -37,7 +37,7 @@ export default function DashboardHeader({
           <div className="flex items-center gap-3">
             {username && (
               <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/15 text-white">
-                {username}
+                SC{username}
               </span>
             )}
 

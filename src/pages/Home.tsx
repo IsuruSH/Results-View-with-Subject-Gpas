@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { fetchHomeData } from "../services/api";
-import type { HomeData, GpaResults } from "../types";
+import { fetchHomeData, fetchNotices } from "../services/api";
+import type { HomeData, GpaResults, NoticesData } from "../types";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardFooter from "../components/dashboard/DashboardFooter";
@@ -16,7 +16,9 @@ import GpaSummaryCard from "../components/home/GpaSummaryCard";
 export default function Home() {
   const { session, username, signOut, consumeInitialResults } = useAuth();
   const [homeData, setHomeData] = useState<HomeData | null>(null);
+  const [noticesData, setNoticesData] = useState<NoticesData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [noticesLoading, setNoticesLoading] = useState(true);
   const [cachedResults, setCachedResults] = useState<GpaResults | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const fetchedRef = useRef(false);
@@ -32,22 +34,37 @@ export default function Home() {
   const loadHomeData = useCallback(async () => {
     if (!session) return;
     setLoading(true);
+    setNoticesLoading(true);
     try {
-      const data = await fetchHomeData(session);
-      setHomeData(data);
+      // Fetch home data and notices in parallel
+      const [data, notices] = await Promise.allSettled([
+        fetchHomeData(session),
+        fetchNotices(session),
+      ]);
 
-      // Use photo from FOSMIS response, or fallback to constructed URL
-      if (data.photoUrl) {
-        setProfileImage(data.photoUrl);
-      } else if (username) {
-        setProfileImage(
-          `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
-        );
+      if (data.status === "fulfilled") {
+        setHomeData(data.value);
+
+        // Use photo from FOSMIS response, or fallback to constructed URL
+        if (data.value.photoUrl) {
+          setProfileImage(data.value.photoUrl);
+        } else if (username) {
+          setProfileImage(
+            `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
+          );
+        }
+      } else {
+        toast.error("Error loading home data");
+      }
+
+      if (notices.status === "fulfilled") {
+        setNoticesData(notices.value);
       }
     } catch {
       toast.error("Error loading home data");
     } finally {
       setLoading(false);
+      setNoticesLoading(false);
     }
   }, [session, username]);
 
@@ -105,7 +122,7 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-6">
             <QuickActions />
             <AcademicServices />
-            <NoticeBoard notices={homeData?.notices || []} loading={loading} />
+            <NoticeBoard noticesData={noticesData} loading={noticesLoading} />
           </div>
 
           {/* Right column - 1/3 */}

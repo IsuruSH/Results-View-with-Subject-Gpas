@@ -8,6 +8,7 @@ import {
   MessageSquare,
   ExternalLink,
 } from "lucide-react";
+import { openFosmisPage } from "../../utils/fosmisNav";
 
 const FOSMIS_BASE = "https://paravi.ruh.ac.lk/fosmis";
 
@@ -164,16 +165,14 @@ export default function AcademicServices() {
                 >
                   <div className="px-5 pb-4 space-y-1">
                     {cat.links.map((link) => (
-                      <a
+                      <button
                         key={link.label}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors group"
+                        onClick={() => openFosmisPage(link.url)}
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors group cursor-pointer"
                       >
                         <span>{link.label}</span>
                         <ExternalLink className="w-3.5 h-3.5 text-gray-300 group-hover:text-indigo-400 transition-colors" />
-                      </a>
+                      </button>
                     ))}
                   </div>
                 </motion.div>

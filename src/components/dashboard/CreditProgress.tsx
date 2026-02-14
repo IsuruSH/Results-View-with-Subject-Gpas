@@ -5,11 +5,16 @@ import { DEGREE_CREDIT_TARGETS } from "../../constants/grades";
 
 interface CreditProgressProps {
   totalCredits: number | undefined;
+  confirmedCredits?: number;
 }
 
-export default function CreditProgress({ totalCredits }: CreditProgressProps) {
+export default function CreditProgress({
+  totalCredits,
+  confirmedCredits,
+}: CreditProgressProps) {
   const [degreeIdx, setDegreeIdx] = useState(0);
-  const credits = totalCredits ?? 0;
+  // Prefer confirmed credits from FOSMIS registration (includes courses without results yet)
+  const credits = confirmedCredits ?? totalCredits ?? 0;
   if (credits === 0) return null;
 
   const target = DEGREE_CREDIT_TARGETS[degreeIdx].credits;

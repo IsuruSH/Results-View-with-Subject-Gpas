@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { GraduationCap, LogOut, Home, BarChart3 } from "lucide-react";
+import { GraduationCap, LogOut, Home, BarChart3, BookOpen } from "lucide-react";
 
 interface DashboardHeaderProps {
   username: string | null;
@@ -20,6 +20,7 @@ export default function DashboardHeader({
 
   const isHome = location.pathname === "/home";
   const isResults = location.pathname === "/results" || location.pathname === "/";
+  const isGuide = location.pathname === "/academic-guide";
 
   return (
     <header className="bg-gradient-to-r from-indigo-700 to-indigo-800 shadow-lg">
@@ -65,6 +66,17 @@ export default function DashboardHeader({
               >
                 <BarChart3 className="w-3.5 h-3.5" />
                 Results
+              </button>
+              <button
+                onClick={() => navigate("/academic-guide")}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  isGuide
+                    ? "bg-white/20 text-white"
+                    : "text-indigo-200/70 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                Guide
               </button>
             </nav>
           </div>
@@ -115,6 +127,17 @@ export default function DashboardHeader({
                 title="Results"
               >
                 <BarChart3 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => navigate("/academic-guide")}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  isGuide
+                    ? "bg-white/20 text-white"
+                    : "text-indigo-200/70 hover:text-white hover:bg-white/10"
+                }`}
+                title="Academic Guide"
+              >
+                <BookOpen className="w-4 h-4" />
               </button>
             </div>
 

@@ -236,7 +236,10 @@ export default function Results() {
 
             {/* Credit Progress */}
             {results && (
-              <CreditProgress totalCredits={results.totalCredits} />
+              <CreditProgress
+                totalCredits={results.totalCredits}
+                confirmedCredits={results.confirmedCredits}
+              />
             )}
 
             {/* Analytics Grid */}

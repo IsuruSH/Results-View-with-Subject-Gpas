@@ -64,6 +64,28 @@ export async function fetchHomeData(sessionId: string) {
 }
 
 /**
+ * GET /course-registration — Fetch parsed course registration data.
+ */
+export async function fetchCourseRegistration(sessionId: string) {
+  const response = await fetch(`${SERVER_URL}/course-registration`, {
+    headers: { authorization: sessionId },
+    credentials: "include",
+  });
+  return response.json();
+}
+
+/**
+ * GET /notices — Fetch structured notices from FOSMIS notice board.
+ */
+export async function fetchNotices(sessionId: string) {
+  const response = await fetch(`${SERVER_URL}/notices`, {
+    headers: { authorization: sessionId },
+    credentials: "include",
+  });
+  return response.json();
+}
+
+/**
  * POST /calculateGPA — Calculate GPA with manual + repeated subjects.
  */
 export async function calculateGPA(

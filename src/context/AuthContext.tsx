@@ -38,6 +38,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("PHPSESSID", sessionId);
     localStorage.setItem("username", formattedUsername);
 
+    // Store credentials so useFosmisSession can auto-login in the browser
+    sessionStorage.setItem("fosmis_uname", rawUsername);
+    sessionStorage.setItem("fosmis_upwd", password);
+
     // Store pre-fetched results for the Results page to pick up instantly
     if (data.results) {
       initialResultsRef.current = data.results;
@@ -55,6 +59,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       localStorage.removeItem("PHPSESSID");
       localStorage.removeItem("username");
+      sessionStorage.removeItem("fosmis_uname");
+      sessionStorage.removeItem("fosmis_upwd");
+      sessionStorage.removeItem("fosmis_browser_authed");
       setSession(null);
       setUsername(null);
       initialResultsRef.current = null;

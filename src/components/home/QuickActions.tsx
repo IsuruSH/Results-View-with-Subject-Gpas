@@ -8,6 +8,7 @@ import {
   BookOpen,
   FileSpreadsheet,
 } from "lucide-react";
+import { openFosmisPage } from "../../utils/fosmisNav";
 
 const FOSMIS_BASE = "https://paravi.ruh.ac.lk/fosmis";
 
@@ -38,11 +39,11 @@ const actions = [
   },
   {
     title: "Course Registration",
-    description: "Register for courses",
+    description: "View registered courses & credits",
     icon: BookOpen,
     color: "from-purple-500 to-violet-600",
     shadow: "shadow-purple-500/25",
-    href: `${FOSMIS_BASE}/index.php?view=admin&admin=1`,
+    route: "/courses",
   },
   {
     title: "Exam Eligibility",
@@ -99,7 +100,7 @@ export default function QuickActions() {
               if (action.route) {
                 navigate(action.route);
               } else if (action.href) {
-                window.open(action.href, "_blank", "noopener,noreferrer");
+                openFosmisPage(action.href);
               }
             }}
             className={`group relative overflow-hidden rounded-xl bg-white border border-gray-100 p-4 text-left shadow-sm hover:shadow-lg ${action.shadow} transition-all duration-200`}

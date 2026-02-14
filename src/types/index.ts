@@ -60,6 +60,8 @@ export interface GpaResults {
   levelGpas?: { level1?: string; level2?: string; level3?: string };
   totalCredits?: number;
   totalGradePoints?: number;
+  confirmedCredits?: number;
+  nonDegreeSubjects?: string[];
 }
 
 export interface MentorDetails {
@@ -75,8 +77,43 @@ export interface MentorDetails {
 export interface HomeData {
   studentName: string;
   mentor: MentorDetails;
-  notices: string[];
   photoUrl: string;
+}
+
+export interface Notice {
+  id: number;
+  date: string;
+  time: string;
+  title: string;
+  fileUrl: string;
+  fileType: "pdf" | "docx" | "png" | "jpg" | "other";
+}
+
+export interface NoticesData {
+  recentNotices: Notice[];
+  previousNotices: Notice[];
+}
+
+export interface RegisteredCourse {
+  code: string;
+  name: string;
+  degreeStatus: string;
+  confirmation: string;
+}
+
+export interface CurrentSemester {
+  academicYear: string;
+  semester: string;
+  credits: number;
+  courses: RegisteredCourse[];
+}
+
+export interface CourseRegistrationData {
+  currentSemester: CurrentSemester;
+  allCourses: RegisteredCourse[];
+  totalConfirmedCredits: number;
+  departments: string[];
+  nonDegreeSubjects: string[];
 }
 
 export interface AuthContextType {

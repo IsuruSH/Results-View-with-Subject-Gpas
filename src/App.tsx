@@ -3,6 +3,8 @@ import { Toaster } from "react-hot-toast";
 import Login from "./pages/Login";
 import Results from "./pages/Results";
 import Home from "./pages/Home";
+import CourseRegistration from "./pages/CourseRegistration";
+import AcademicGuide from "./pages/AcademicGuide";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -25,6 +27,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/courses"
+            element={
+              <ProtectedRoute>
+                <CourseRegistration />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/academic-guide"
+            element={
+              <ProtectedRoute>
+                <AcademicGuide />
               </ProtectedRoute>
             }
           />

@@ -62,9 +62,28 @@ export interface GpaResults {
   totalGradePoints?: number;
 }
 
+export interface MentorDetails {
+  name: string;
+  designation: string;
+  department: string;
+  email: string;
+  internalTp: string;
+  residence: string;
+  mobile: string;
+}
+
+export interface HomeData {
+  studentName: string;
+  mentor: MentorDetails;
+  notices: string[];
+  photoUrl: string;
+}
+
 export interface AuthContextType {
   session: string | null;
   username: string | null;
+  /** Read and consume the results pre-fetched during login (returns null after first call). */
+  consumeInitialResults: () => GpaResults | null;
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }

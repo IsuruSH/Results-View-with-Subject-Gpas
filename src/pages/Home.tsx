@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { fetchHomeData, fetchNotices } from "../services/api";
@@ -21,18 +21,21 @@ import GpaSummaryCard from "../components/home/GpaSummaryCard";
 
 export default function Home() {
   const { session, username, signOut, consumeInitialResults } = useAuth();
-  const [homeData, setHomeData] = useState<HomeData | null>(null);
-  const [noticesData, setNoticesData] = useState<NoticesData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [noticesLoading, setNoticesLoading] = useState(true);
-  // Seed GPA results from centralized cache immediately (no flash of empty)
+
+  // ---------------------------------------------------------------------------
+  // State — ALL seeded from centralized cache for instant render on navigation
+  // ---------------------------------------------------------------------------
+  const [homeData, setHomeData] = useState<HomeData | null>(
+    () => getCached<HomeData>(CACHE_KEYS.homeData)
+  );
+  const [noticesData, setNoticesData] = useState<NoticesData | null>(
+    () => getCached<NoticesData>(CACHE_KEYS.notices)
+  );
   const [cachedResults, setCachedResults] = useState<GpaResults | null>(() => {
-    // Try in-memory cache first (fastest)
     if (username) {
       const mem = getCached<GpaResults>(CACHE_KEYS.results(username, "4"));
       if (mem) return mem;
     }
-    // Fallback to sessionStorage
     try {
       const stored = sessionStorage.getItem("homeGpaCache");
       if (stored) return JSON.parse(stored);
@@ -41,10 +44,16 @@ export default function Home() {
     }
     return null;
   });
-  // Profile image: resolve from cache immediately (no flash)
   const [profileImage, setProfileImage] = useState<string | null>(() =>
     getProfileImage(username)
   );
+
+  // Loading flags — false if data was seeded from cache (no spinner flash)
+  const [loading, setLoading] = useState(() => !getCached(CACHE_KEYS.homeData));
+  const [noticesLoading, setNoticesLoading] = useState(
+    () => !getCached(CACHE_KEYS.notices)
+  );
+
   const fetchedRef = useRef(false);
 
   const handleSignOut = async () => {
@@ -55,52 +64,39 @@ export default function Home() {
     }
   };
 
-  const loadHomeData = useCallback(async () => {
-    if (!session) return;
-    setLoading(true);
-    setNoticesLoading(true);
-    try {
-      // Both use centralized cache + dedup — instant if already fetched
-      const [data, notices] = await Promise.allSettled([
-        fetchHomeData(session),
-        fetchNotices(session),
-      ]);
-
-      if (data.status === "fulfilled") {
-        setHomeData(data.value);
-
-        // Update profile image if FOSMIS returned a better URL
-        if (data.value.photoUrl) {
-          setProfileImage(data.value.photoUrl);
-          if (username) cacheProfileImage(username, data.value.photoUrl);
-        }
-      } else {
-        toast.error("Error loading home data");
-      }
-
-      if (notices.status === "fulfilled") {
-        setNoticesData(notices.value);
-      }
-    } catch {
-      toast.error("Error loading home data");
-    } finally {
-      setLoading(false);
-      setNoticesLoading(false);
-    }
-  }, [session, username]);
+  // ---------------------------------------------------------------------------
+  // Independent fetches — each section updates as its data arrives (streaming)
+  // No Promise.allSettled — fast data renders immediately, slow data streams in.
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     if (!session || fetchedRef.current) return;
     fetchedRef.current = true;
 
-    // Try to grab pre-fetched results from login (for GPA summary)
+    // Grab pre-fetched results from login
     const prefetched = consumeInitialResults();
-    if (prefetched) {
-      setCachedResults(prefetched);
-    }
+    if (prefetched) setCachedResults(prefetched);
 
-    loadHomeData();
-  }, [session, loadHomeData, consumeInitialResults]);
+    // Fire home data fetch independently
+    fetchHomeData(session)
+      .then((data) => {
+        setHomeData(data);
+        if (data.photoUrl) {
+          setProfileImage(data.photoUrl);
+          if (username) cacheProfileImage(username, data.photoUrl);
+        }
+      })
+      .catch(() => toast.error("Error loading home data"))
+      .finally(() => setLoading(false));
+
+    // Fire notices fetch independently — renders when ready, doesn't block hero/mentor
+    fetchNotices(session)
+      .then((data) => setNoticesData(data))
+      .catch(() => {
+        /* silent — notices section just shows loading */
+      })
+      .finally(() => setNoticesLoading(false));
+  }, [session, username, consumeInitialResults]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

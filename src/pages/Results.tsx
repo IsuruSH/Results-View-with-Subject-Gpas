@@ -28,7 +28,7 @@ import GpaTargetPlanner from "../components/dashboard/GpaTargetPlanner";
 import ExcelExport from "../components/dashboard/ExcelExport";
 
 export default function Results() {
-  const { signOut, username, session } = useAuth();
+  const { signOut, username, session, consumeInitialResults } = useAuth();
   const [rlevel, setRlevel] = useState("4");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<GpaResults | null>(null);
@@ -47,6 +47,10 @@ export default function Results() {
   const [includeRepeated, setIncludeRepeated] = useState(true);
 
   const gpaOverviewRef = useRef<HTMLDivElement>(null);
+  // Tracks whether the initial prefetch has been applied.
+  // Persists across StrictMode double-mount so the second mount skips fetching.
+  const prefetchApplied = useRef(false);
+  const prevRlevel = useRef(rlevel);
 
   const handleSignOut = async () => {
     try {
@@ -56,16 +60,17 @@ export default function Results() {
     }
   };
 
-  const loadResults = useCallback(async () => {
-    if (!username || !session) return;
-    setLoading(true);
-    try {
-      setProfileImage(
-        `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
-      );
-
-      const data = await fetchResults(session, username, rlevel);
+  /** Apply fetched/cached result data to component state. */
+  const applyResults = useCallback(
+    (data: GpaResults) => {
       setResults(data);
+
+      // Cache for Home page GPA summary card
+      try {
+        sessionStorage.setItem("homeGpaCache", JSON.stringify(data));
+      } catch {
+        // ignore quota errors
+      }
 
       if (data.repeatedSubjects) {
         setRepeatedSubjects(data.repeatedSubjects);
@@ -75,16 +80,59 @@ export default function Results() {
         });
         setEditableGrades(initialGrades);
       }
-    } catch {
-      toast.error("Error fetching results");
-    } finally {
-      setLoading(false);
-    }
-  }, [username, session, rlevel]);
+    },
+    []
+  );
+
+  const loadResults = useCallback(
+    async () => {
+      if (!username || !session) return;
+      setLoading(true);
+
+      setProfileImage(
+        `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
+      );
+
+      try {
+        const data = await fetchResults(session, username, rlevel);
+        applyResults(data);
+      } catch {
+        toast.error("Error fetching results");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [username, session, rlevel, applyResults]
+  );
 
   useEffect(() => {
+    if (!username || !session) return;
+
+    // If rlevel changed, clear the prefetch flag so we fetch fresh data
+    if (prevRlevel.current !== rlevel) {
+      prevRlevel.current = rlevel;
+      prefetchApplied.current = false;
+    }
+
+    // On first load after login, use pre-fetched results (instant render).
+    // prefetchApplied survives StrictMode's double-mount:
+    //   1st mount: consume → set flag → apply → return
+    //   2nd mount: flag is true → return (state from 1st mount persists)
+    if (!prefetchApplied.current) {
+      const prefetched = consumeInitialResults();
+      if (prefetched) {
+        prefetchApplied.current = true;
+        setProfileImage(
+          `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
+        );
+        applyResults(prefetched);
+        return;
+      }
+    }
+    if (prefetchApplied.current) return; // StrictMode 2nd mount — skip
+
     loadResults();
-  }, [loadResults]);
+  }, [loadResults, username, session, rlevel, consumeInitialResults, applyResults]);
 
   useEffect(() => {
     setGpaFormData((prev) => ({ ...prev, stnum: username || "" }));
@@ -188,7 +236,10 @@ export default function Results() {
 
             {/* Credit Progress */}
             {results && (
-              <CreditProgress totalCredits={results.totalCredits} />
+              <CreditProgress
+                totalCredits={results.totalCredits}
+                confirmedCredits={results.confirmedCredits}
+              />
             )}
 
             {/* Analytics Grid */}

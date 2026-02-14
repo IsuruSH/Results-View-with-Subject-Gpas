@@ -19,7 +19,7 @@ export default function Login() {
 
       try {
         await Promise.resolve(signIn(username, password));
-        navigate("/");
+        navigate("/results");
       } catch (error) {
         toast.error("Invalid credentials");
       } finally {

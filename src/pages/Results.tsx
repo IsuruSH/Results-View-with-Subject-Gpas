@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 
 import { fetchResults, calculateGPA } from "../services/api";
+import { getProfileImage } from "../services/dataCache";
 import type { GpaFormData, GpaResults, RepeatedSubject } from "../types";
 
 // Layout
@@ -37,7 +38,10 @@ export default function Results() {
     manualSubjects: { subjects: [""], grades: [""] },
     repeatedSubjects: { subjects: [], grades: [] },
   });
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  // Profile image: resolved once from cache / localStorage
+  const [profileImage] = useState<string | null>(() =>
+    getProfileImage(username)
+  );
   const [repeatedSubjects, setRepeatedSubjects] = useState<RepeatedSubject[]>(
     []
   );
@@ -48,7 +52,6 @@ export default function Results() {
 
   const gpaOverviewRef = useRef<HTMLDivElement>(null);
   // Tracks whether the initial prefetch has been applied.
-  // Persists across StrictMode double-mount so the second mount skips fetching.
   const prefetchApplied = useRef(false);
   const prevRlevel = useRef(rlevel);
 
@@ -64,13 +67,6 @@ export default function Results() {
   const applyResults = useCallback(
     (data: GpaResults) => {
       setResults(data);
-
-      // Cache for Home page GPA summary card
-      try {
-        sessionStorage.setItem("homeGpaCache", JSON.stringify(data));
-      } catch {
-        // ignore quota errors
-      }
 
       if (data.repeatedSubjects) {
         setRepeatedSubjects(data.repeatedSubjects);
@@ -89,11 +85,8 @@ export default function Results() {
       if (!username || !session) return;
       setLoading(true);
 
-      setProfileImage(
-        `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
-      );
-
       try {
+        // fetchResults uses the centralized cache + dedup internally
         const data = await fetchResults(session, username, rlevel);
         applyResults(data);
       } catch {
@@ -115,16 +108,10 @@ export default function Results() {
     }
 
     // On first load after login, use pre-fetched results (instant render).
-    // prefetchApplied survives StrictMode's double-mount:
-    //   1st mount: consume → set flag → apply → return
-    //   2nd mount: flag is true → return (state from 1st mount persists)
     if (!prefetchApplied.current) {
       const prefetched = consumeInitialResults();
       if (prefetched) {
         prefetchApplied.current = true;
-        setProfileImage(
-          `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
-        );
         applyResults(prefetched);
         return;
       }

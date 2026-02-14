@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { fetchHomeData, fetchNotices } from "../services/api";
+import {
+  getProfileImage,
+  setProfileImage as cacheProfileImage,
+  getCached,
+  CACHE_KEYS,
+} from "../services/dataCache";
 import type { HomeData, GpaResults, NoticesData } from "../types";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -19,8 +25,26 @@ export default function Home() {
   const [noticesData, setNoticesData] = useState<NoticesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [noticesLoading, setNoticesLoading] = useState(true);
-  const [cachedResults, setCachedResults] = useState<GpaResults | null>(null);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  // Seed GPA results from centralized cache immediately (no flash of empty)
+  const [cachedResults, setCachedResults] = useState<GpaResults | null>(() => {
+    // Try in-memory cache first (fastest)
+    if (username) {
+      const mem = getCached<GpaResults>(CACHE_KEYS.results(username, "4"));
+      if (mem) return mem;
+    }
+    // Fallback to sessionStorage
+    try {
+      const stored = sessionStorage.getItem("homeGpaCache");
+      if (stored) return JSON.parse(stored);
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+  // Profile image: resolve from cache immediately (no flash)
+  const [profileImage, setProfileImage] = useState<string | null>(() =>
+    getProfileImage(username)
+  );
   const fetchedRef = useRef(false);
 
   const handleSignOut = async () => {
@@ -36,7 +60,7 @@ export default function Home() {
     setLoading(true);
     setNoticesLoading(true);
     try {
-      // Fetch home data and notices in parallel
+      // Both use centralized cache + dedup — instant if already fetched
       const [data, notices] = await Promise.allSettled([
         fetchHomeData(session),
         fetchNotices(session),
@@ -45,13 +69,10 @@ export default function Home() {
       if (data.status === "fulfilled") {
         setHomeData(data.value);
 
-        // Use photo from FOSMIS response, or fallback to constructed URL
+        // Update profile image if FOSMIS returned a better URL
         if (data.value.photoUrl) {
           setProfileImage(data.value.photoUrl);
-        } else if (username) {
-          setProfileImage(
-            `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
-          );
+          if (username) cacheProfileImage(username, data.value.photoUrl);
         }
       } else {
         toast.error("Error loading home data");
@@ -78,25 +99,8 @@ export default function Home() {
       setCachedResults(prefetched);
     }
 
-    // Also check sessionStorage for cached results from Results page visits
-    const stored = sessionStorage.getItem("homeGpaCache");
-    if (stored && !prefetched) {
-      try {
-        setCachedResults(JSON.parse(stored));
-      } catch {
-        // ignore
-      }
-    }
-
     loadHomeData();
   }, [session, loadHomeData, consumeInitialResults]);
-
-  // Cache results in sessionStorage when they arrive (for persisting across navigations)
-  useEffect(() => {
-    if (cachedResults) {
-      sessionStorage.setItem("homeGpaCache", JSON.stringify(cachedResults));
-    }
-  }, [cachedResults]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

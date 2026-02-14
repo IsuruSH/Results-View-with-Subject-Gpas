@@ -1,9 +1,19 @@
+import {
+  getCached,
+  setCached,
+  dedupFetch,
+  CACHE_KEYS,
+} from "./dataCache";
+
 const SERVER_URL = import.meta.env.VITE_SERVER_URL;
+
+// ---------------------------------------------------------------------------
+// Auth (never cached / deduped)
+// ---------------------------------------------------------------------------
 
 /**
  * POST /init — Authenticate with FOSMIS credentials.
- * Also sends rlevel + stnum so the backend can pre-fetch results in the
- * same round-trip, saving ~500 ms on initial load.
+ * Backend pre-fetches results in the same round-trip.
  */
 export async function login(
   username: string,
@@ -34,56 +44,104 @@ export async function logout(): Promise<void> {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Data endpoints — with cache + deduplication
+// ---------------------------------------------------------------------------
+
 /**
  * GET /results — Fetch student results and GPAs.
+ * Uses in-memory cache + request deduplication.
  */
 export async function fetchResults(
   sessionId: string,
   stnum: string,
   rlevel: string
 ) {
-  const response = await fetch(
-    `${SERVER_URL}/results?stnum=${encodeURIComponent(stnum)}&rlevel=${encodeURIComponent(rlevel)}`,
-    {
-      headers: { authorization: sessionId },
-      credentials: "include",
+  const key = CACHE_KEYS.results(stnum, rlevel);
+
+  // Return cached data if fresh
+  const cached = getCached(key);
+  if (cached) return cached;
+
+  return dedupFetch(key, async () => {
+    const response = await fetch(
+      `${SERVER_URL}/results?stnum=${encodeURIComponent(stnum)}&rlevel=${encodeURIComponent(rlevel)}`,
+      {
+        headers: { authorization: sessionId },
+        credentials: "include",
+      }
+    );
+    const data = await response.json();
+    // Also update the sessionStorage cache for Home page fallback
+    try {
+      sessionStorage.setItem("homeGpaCache", JSON.stringify(data));
+    } catch {
+      // ignore
     }
-  );
-  return response.json();
+    return data;
+  });
 }
 
 /**
  * GET /home-data — Fetch FOSMIS homepage data (mentor, notices, etc.).
  */
 export async function fetchHomeData(sessionId: string) {
-  const response = await fetch(`${SERVER_URL}/home-data`, {
-    headers: { authorization: sessionId },
-    credentials: "include",
+  const key = CACHE_KEYS.homeData;
+  const cached = getCached(key);
+  if (cached) return cached;
+
+  return dedupFetch(key, async () => {
+    const response = await fetch(`${SERVER_URL}/home-data`, {
+      headers: { authorization: sessionId },
+      credentials: "include",
+    });
+    const data = await response.json();
+    setCached(key, data);
+    return data;
   });
-  return response.json();
 }
 
 /**
  * GET /course-registration — Fetch parsed course registration data.
  */
 export async function fetchCourseRegistration(sessionId: string) {
-  const response = await fetch(`${SERVER_URL}/course-registration`, {
-    headers: { authorization: sessionId },
-    credentials: "include",
+  const key = CACHE_KEYS.courseReg;
+  const cached = getCached(key);
+  if (cached) return cached;
+
+  return dedupFetch(key, async () => {
+    const response = await fetch(`${SERVER_URL}/course-registration`, {
+      headers: { authorization: sessionId },
+      credentials: "include",
+    });
+    const data = await response.json();
+    setCached(key, data);
+    return data;
   });
-  return response.json();
 }
 
 /**
  * GET /notices — Fetch structured notices from FOSMIS notice board.
  */
 export async function fetchNotices(sessionId: string) {
-  const response = await fetch(`${SERVER_URL}/notices`, {
-    headers: { authorization: sessionId },
-    credentials: "include",
+  const key = CACHE_KEYS.notices;
+  const cached = getCached(key);
+  if (cached) return cached;
+
+  return dedupFetch(key, async () => {
+    const response = await fetch(`${SERVER_URL}/notices`, {
+      headers: { authorization: sessionId },
+      credentials: "include",
+    });
+    const data = await response.json();
+    setCached(key, data);
+    return data;
   });
-  return response.json();
 }
+
+// ---------------------------------------------------------------------------
+// GPA calculator — never cached (user-submitted data)
+// ---------------------------------------------------------------------------
 
 /**
  * POST /calculateGPA — Calculate GPA with manual + repeated subjects.

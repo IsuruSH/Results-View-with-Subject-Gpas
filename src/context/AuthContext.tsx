@@ -7,6 +7,14 @@ import React, {
 } from "react";
 import type { AuthContextType, GpaResults } from "../types";
 import { login, logout } from "../services/api";
+import {
+  clearCache,
+  setCached,
+  CACHE_KEYS,
+  setProfileImage,
+  clearProfileImage,
+  getProfileImage,
+} from "../services/dataCache";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -42,9 +50,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.setItem("fosmis_uname", rawUsername);
     sessionStorage.setItem("fosmis_upwd", password);
 
-    // Store pre-fetched results for the Results page to pick up instantly
+    // Pre-cache profile image URL
+    const imgUrl = getProfileImage(formattedUsername);
+    if (imgUrl) setProfileImage(formattedUsername, imgUrl);
+
+    // Store pre-fetched results in both ref (for immediate consume) and
+    // in the centralized cache (for cross-page sharing)
     if (data.results) {
       initialResultsRef.current = data.results;
+      setCached(CACHE_KEYS.results(formattedUsername, "4"), data.results);
+      // Also seed the sessionStorage cache for Home page GPA card
+      try {
+        sessionStorage.setItem("homeGpaCache", JSON.stringify(data.results));
+      } catch {
+        // ignore
+      }
     }
 
     setSession(sessionId);
@@ -62,6 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem("fosmis_uname");
       sessionStorage.removeItem("fosmis_upwd");
       sessionStorage.removeItem("fosmis_browser_authed");
+      sessionStorage.removeItem("homeGpaCache");
+      clearCache();
+      clearProfileImage();
       setSession(null);
       setUsername(null);
       initialResultsRef.current = null;

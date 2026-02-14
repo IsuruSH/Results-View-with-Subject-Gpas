@@ -20,6 +20,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 import { fetchResults, fetchCourseRegistration } from "../services/api";
+import { getProfileImage, getCached, CACHE_KEYS } from "../services/dataCache";
 import type { GpaResults, CourseRegistrationData } from "../types";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -967,23 +968,30 @@ function CollapsibleSection({
 export default function AcademicGuide() {
   const { session, username, signOut } = useAuth();
   const navigate = useNavigate();
-  const [profileImage] = useState<string | null>(
-    username
-      ? `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
-      : null
+  const [profileImage] = useState<string | null>(() =>
+    getProfileImage(username)
   );
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
-  // Data for degree progress
-  const [results, setResults] = useState<GpaResults | null>(null);
-  const [courseData, setCourseData] = useState<CourseRegistrationData | null>(null);
-  const [progressLoading, setProgressLoading] = useState(true);
+  // Data for degree progress — seed from centralized cache for instant render
+  const [results, setResults] = useState<GpaResults | null>(() => {
+    if (!username) return null;
+    return getCached<GpaResults>(CACHE_KEYS.results(username, "4"));
+  });
+  const [courseData, setCourseData] = useState<CourseRegistrationData | null>(
+    () => getCached<CourseRegistrationData>(CACHE_KEYS.courseReg)
+  );
+  const [progressLoading, setProgressLoading] = useState(
+    // If we already have cached data, skip the loading spinner
+    () => !results
+  );
   const fetchedRef = useRef(false);
 
   const loadProgressData = useCallback(async () => {
     if (!session || !username) return;
-    setProgressLoading(true);
+    if (!results) setProgressLoading(true);
     try {
+      // Both use centralized cache + dedup — instant if already fetched
       const [resData, courseRegData] = await Promise.allSettled([
         fetchResults(session, username, "4"),
         fetchCourseRegistration(session),
@@ -995,7 +1003,7 @@ export default function AcademicGuide() {
     } finally {
       setProgressLoading(false);
     }
-  }, [session, username]);
+  }, [session, username, results]);
 
   useEffect(() => {
     if (!session || fetchedRef.current) return;

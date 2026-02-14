@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { fetchCourseRegistration } from "../services/api";
+import { getProfileImage, getCached, CACHE_KEYS } from "../services/dataCache";
 import type { CourseRegistrationData, RegisteredCourse } from "../types";
 import { DEGREE_CREDIT_TARGETS } from "../constants/grades";
 
@@ -59,12 +60,17 @@ function getCreditFromCode(code: string): number {
 export default function CourseRegistration() {
   const { session, username, signOut } = useAuth();
   const navigate = useNavigate();
-  const [data, setData] = useState<CourseRegistrationData | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Seed from centralized cache for instant render
+  const [data, setData] = useState<CourseRegistrationData | null>(
+    () => getCached<CourseRegistrationData>(CACHE_KEYS.courseReg)
+  );
+  const [loading, setLoading] = useState(() => !data);
   const [degreeIdx, setDegreeIdx] = useState(0);
   const [openYears, setOpenYears] = useState<Set<number>>(new Set());
   const fetchedRef = useRef(false);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileImage] = useState<string | null>(() =>
+    getProfileImage(username)
+  );
 
   const handleSignOut = async () => {
     try { await signOut(); } catch { toast.error("Error signing out"); }
@@ -72,8 +78,9 @@ export default function CourseRegistration() {
 
   const loadData = useCallback(async () => {
     if (!session) return;
-    setLoading(true);
+    if (!data) setLoading(true);
     try {
+      // Uses centralized cache + dedup internally
       const resp = await fetchCourseRegistration(session);
       setData(resp);
     } catch {
@@ -81,18 +88,13 @@ export default function CourseRegistration() {
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  }, [session, data]);
 
   useEffect(() => {
     if (!session || fetchedRef.current) return;
     fetchedRef.current = true;
-    if (username) {
-      setProfileImage(
-        `https://paravi.ruh.ac.lk/rumis/picture/user_pictures/student_std_pics/fosmis_pic/sc${username}.jpg`
-      );
-    }
     loadData();
-  }, [session, username, loadData]);
+  }, [session, loadData]);
 
   // Auto-expand all years once data loads
   useEffect(() => {

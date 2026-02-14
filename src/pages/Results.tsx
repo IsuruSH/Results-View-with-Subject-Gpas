@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 
 import { fetchResults, calculateGPA } from "../services/api";
-import { getProfileImage } from "../services/dataCache";
+import { getProfileImage, getCached, CACHE_KEYS } from "../services/dataCache";
 import type { GpaFormData, GpaResults, RepeatedSubject } from "../types";
 
 // Layout
@@ -31,14 +31,21 @@ import ExcelExport from "../components/dashboard/ExcelExport";
 export default function Results() {
   const { signOut, username, session, consumeInitialResults } = useAuth();
   const [rlevel, setRlevel] = useState("4");
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<GpaResults | null>(null);
+
+  // Seed results from centralized cache for instant render on re-navigation
+  const [results, setResults] = useState<GpaResults | null>(() => {
+    if (!username) return null;
+    return getCached<GpaResults>(CACHE_KEYS.results(username, "4"));
+  });
+  const [loading, setLoading] = useState(() => {
+    if (!username) return false;
+    return !getCached(CACHE_KEYS.results(username, "4"));
+  });
   const [gpaFormData, setGpaFormData] = useState<GpaFormData>({
     stnum: username || "",
     manualSubjects: { subjects: [""], grades: [""] },
     repeatedSubjects: { subjects: [], grades: [] },
   });
-  // Profile image: resolved once from cache / localStorage
   const [profileImage] = useState<string | null>(() =>
     getProfileImage(username)
   );
@@ -51,7 +58,6 @@ export default function Results() {
   const [includeRepeated, setIncludeRepeated] = useState(true);
 
   const gpaOverviewRef = useRef<HTMLDivElement>(null);
-  // Tracks whether the initial prefetch has been applied.
   const prefetchApplied = useRef(false);
   const prevRlevel = useRef(rlevel);
 
@@ -83,7 +89,8 @@ export default function Results() {
   const loadResults = useCallback(
     async () => {
       if (!username || !session) return;
-      setLoading(true);
+      // Only show loading spinner if we don't have data yet
+      if (!results) setLoading(true);
 
       try {
         // fetchResults uses the centralized cache + dedup internally
@@ -95,19 +102,22 @@ export default function Results() {
         setLoading(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [username, session, rlevel, applyResults]
   );
 
   useEffect(() => {
     if (!username || !session) return;
 
-    // If rlevel changed, clear the prefetch flag so we fetch fresh data
+    // If rlevel changed, need fresh data for the new level
     if (prevRlevel.current !== rlevel) {
       prevRlevel.current = rlevel;
       prefetchApplied.current = false;
+      loadResults();
+      return;
     }
 
-    // On first load after login, use pre-fetched results (instant render).
+    // On first load after login, consume pre-fetched results (instant render).
     if (!prefetchApplied.current) {
       const prefetched = consumeInitialResults();
       if (prefetched) {
@@ -115,10 +125,18 @@ export default function Results() {
         applyResults(prefetched);
         return;
       }
+      // If results were seeded from cache in useState initializer, still apply
+      // repeated subjects etc. that aren't seeded separately
+      if (results && !repeatedSubjects.length && results.repeatedSubjects?.length) {
+        applyResults(results);
+        prefetchApplied.current = true;
+        return;
+      }
     }
     if (prefetchApplied.current) return; // StrictMode 2nd mount — skip
 
     loadResults();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadResults, username, session, rlevel, consumeInitialResults, applyResults]);
 
   useEffect(() => {

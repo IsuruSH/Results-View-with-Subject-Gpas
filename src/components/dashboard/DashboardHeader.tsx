@@ -96,7 +96,6 @@ export default function DashboardHeader({
                   alt="Profile"
                   className="w-full h-full object-cover"
                   loading="eager"
-                  fetchPriority="high"
                   decoding="async"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";

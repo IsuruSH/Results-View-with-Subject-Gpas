@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -982,34 +982,30 @@ export default function AcademicGuide() {
     () => getCached<CourseRegistrationData>(CACHE_KEYS.courseReg)
   );
   const [progressLoading, setProgressLoading] = useState(
-    // If we already have cached data, skip the loading spinner
-    () => !results
+    () => {
+      if (!username) return true;
+      // Only show loading if BOTH are missing from cache
+      return !getCached(CACHE_KEYS.results(username, "4"));
+    }
   );
   const fetchedRef = useRef(false);
 
-  const loadProgressData = useCallback(async () => {
-    if (!session || !username) return;
-    if (!results) setProgressLoading(true);
-    try {
-      // Both use centralized cache + dedup — instant if already fetched
-      const [resData, courseRegData] = await Promise.allSettled([
-        fetchResults(session, username, "4"),
-        fetchCourseRegistration(session),
-      ]);
-      if (resData.status === "fulfilled") setResults(resData.value);
-      if (courseRegData.status === "fulfilled") setCourseData(courseRegData.value);
-    } catch {
-      // Silent - progress section just won't show
-    } finally {
-      setProgressLoading(false);
-    }
-  }, [session, username, results]);
-
+  // Fire each fetch independently — whichever resolves first updates its section
   useEffect(() => {
-    if (!session || fetchedRef.current) return;
+    if (!session || !username || fetchedRef.current) return;
     fetchedRef.current = true;
-    loadProgressData();
-  }, [session, loadProgressData]);
+
+    // Results fetch
+    fetchResults(session, username, "4")
+      .then((data) => setResults(data))
+      .catch(() => { /* silent */ })
+      .finally(() => setProgressLoading(false));
+
+    // Course registration fetch
+    fetchCourseRegistration(session)
+      .then((data) => setCourseData(data))
+      .catch(() => { /* silent */ });
+  }, [session, username]);
 
   const handleSignOut = async () => {
     try {

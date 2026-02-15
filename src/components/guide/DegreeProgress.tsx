@@ -12,6 +12,12 @@ import type {
   CourseRegistrationData,
   SubjectBreakdownRow,
 } from "../../types";
+import {
+  isCoreCourse,
+  hasTheoryComponent,
+  hasPracticalComponent,
+  isKnownCourse,
+} from "../../data/courseClassifications";
 
 // ---------------------------------------------------------------------------
 // Degree program definitions
@@ -84,6 +90,8 @@ interface ComputableRequirement {
   unit: string; // "credits" | "%" | "GPA" | "levels" | "pass"
   met: boolean;
   detail?: string;
+  subjects?: SubjectBreakdownRow[];
+  thresholdGS?: number;
 }
 
 /** A requirement that CANNOT be computed - show info card explaining why. */
@@ -96,49 +104,8 @@ interface UnavailableRequirement {
 type Requirement = ComputableRequirement | UnavailableRequirement;
 
 // ---------------------------------------------------------------------------
-// BCS Core subject codes (anything NOT in this set = Optional)
-// Core courses are stable; optional subjects may change year to year.
-// Normalized: lowercase, Greek α→a β→b δ→d
+// BCS Core subjects are now managed in data/courseClassifications.ts
 // ---------------------------------------------------------------------------
-
-const BCS_CORE_CODES = new Set([
-  // Level 1 – Semester 1
-  "csc1113", // Programming Techniques
-  "csc1122", // Computer Systems I
-  "csc113a", // Internet Services and Web Development (CSC113α)
-  "csc1142", // System Analysis and Design
-  "csc1153", // Laboratory Assignments
-  "mat112c", // Differential Equations (MAT112δ)
-  "mat113c", // Introductory Statistics (MAT113δ)
-  // Level 1 – Semester 2
-  "csc1213", // Database Management Systems
-  "csc1223", // Data Structures and Algorithms
-  "csc1233", // Software Engineering
-  "csc1242", // Object Oriented System Development
-  "csc1251", // Computer Laboratory
-  "mat121b", // Algebra (MAT121β)
-  "mat122b", // Calculus (MAT122β)
-  // Level 2 – Semester 1
-  "csc2113", // Data Communication and Computer Networks
-  "csc2123", // Object Oriented Programming
-  "csc2133", // Operating Systems
-  "csc2143", // Computer Graphics and Image Processing
-  "amt212b", // Computational Mathematics (AMT212β)
-  "mat211b", // Linear Algebra I (MAT211β)
-  "phy2112", // Electronics
-  // Level 2 – Semester 2
-  "csc2213", // Rapid Application Development
-  "csc2222", // Computer System II
-  "csc2233", // Internet Programming
-  "csc2242", // Advanced Database Management
-  "csc2252", // Project Management
-  "mat225f", // Mathematical Statistics I (MAT225β)
-  "mat225b", // FOSMIS variant (MAT225β)
-  // Level 3 – Semester 1
-  "csc3113", // Group Projects
-  // Level 3 – Semester 2
-  "csc3216", // Industrial Training
-]);
 
 /** Normalize a subject code: lowercase + Greek→Latin credit char. */
 function norm(code: string): string {
@@ -149,9 +116,7 @@ function norm(code: string): string {
     .replace("\u03b4", "d"); // δ
 }
 
-function isBcsCore(code: string): boolean {
-  return BCS_CORE_CODES.has(norm(code));
-}
+// isBcsCore removed in favor of isCoreCourse from classification data
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -184,8 +149,9 @@ function pctWithGrade(subjects: SubjectBreakdownRow[], minGS: number): number {
 
 function checkEnglish(subjects: SubjectBreakdownRow[], level: number): boolean {
   const prefix = `eng${level}`;
+  // Both BSc and BCS require a minimum of C grade (2.0) for English units
   return subjects.some(
-    (s) => norm(s.subjectCode).startsWith(prefix) && s.gradeScale > 0
+    (s) => norm(s.subjectCode).startsWith(prefix) && s.gradeScale >= 2.0
   );
 }
 
@@ -222,12 +188,12 @@ function creditsWithGradeB(subjects: SubjectBreakdownRow[]): number {
   return sum;
 }
 
-/** Partition BCS subjects into Core vs Optional using the known curriculum. */
+/** Partition BCS subjects into Core vs Optional using handbook classification data. */
 function partitionBcs(creditSubjects: SubjectBreakdownRow[]) {
   const core: SubjectBreakdownRow[] = [];
   const optional: SubjectBreakdownRow[] = [];
   for (const s of creditSubjects) {
-    if (isBcsCore(s.subjectCode)) core.push(s);
+    if (isCoreCourse(s.subjectCode)) core.push(s);
     else optional.push(s);
   }
   return { core, optional };
@@ -247,12 +213,37 @@ function splitBcsCore(core: SubjectBreakdownRow[]) {
   return { cs, maths, other };
 }
 
-const CORE_OPT_REASON =
-  "Cannot be calculated — our data does not distinguish between Core and Optional course units.";
-const THEORY_PRAC_REASON =
-  "Cannot be calculated — our data does not distinguish between Theory and Practical course units.";
 const SPEC_SUBJECT_REASON =
   "Cannot be calculated — we cannot determine which subject you are specializing in from the available data.";
+
+/** Partition BSc subjects into core-theory, core-practical, and optional using handbook data. */
+function partitionBsc(creditSubjects: SubjectBreakdownRow[]) {
+  const coreTheory: SubjectBreakdownRow[] = [];
+  const corePractical: SubjectBreakdownRow[] = []; // practical or combined core
+  const optional: SubjectBreakdownRow[] = [];
+  const unknown: SubjectBreakdownRow[] = [];
+  for (const s of creditSubjects) {
+    const code = s.subjectCode;
+    if (!isKnownCourse(code)) {
+      unknown.push(s);
+      continue;
+    }
+    if (isCoreCourse(code)) {
+      if (hasPracticalComponent(code) && !hasTheoryComponent(code)) {
+        corePractical.push(s);
+      } else if (hasPracticalComponent(code)) {
+        // combined: counts for both checks
+        coreTheory.push(s);
+        corePractical.push(s);
+      } else {
+        coreTheory.push(s);
+      }
+    } else {
+      optional.push(s);
+    }
+  }
+  return { coreTheory, corePractical, optional, unknown };
+}
 
 // ---------------------------------------------------------------------------
 // Requirement builders
@@ -288,6 +279,11 @@ function buildRequirements(
     unit: "levels",
     met: eng1 && eng2,
     detail: `Level I: ${eng1 ? "Passed" : "Pending"}, Level II: ${eng2 ? "Passed" : "Pending"}`,
+    subjects: subjects.filter((s) => {
+      const nCode = norm(s.subjectCode);
+      return nCode.startsWith("eng1") || nCode.startsWith("eng2");
+    }),
+    thresholdGS: 2.0,
   });
   const engReq123 = (): ComputableRequirement => ({
     type: "computable",
@@ -297,6 +293,11 @@ function buildRequirements(
     unit: "levels",
     met: eng1 && eng2 && eng3,
     detail: `I: ${eng1 ? "Passed" : "Pending"}, II: ${eng2 ? "Passed" : "Pending"}, III: ${eng3 ? "Passed" : "Pending"}`,
+    subjects: subjects.filter((s) => {
+      const nCode = norm(s.subjectCode);
+      return nCode.startsWith("eng1") || nCode.startsWith("eng2") || nCode.startsWith("eng3");
+    }),
+    thresholdGS: 2.0,
   });
 
   const industryPlacement = findSubject(creditSubjects, [
@@ -314,6 +315,14 @@ function buildRequirements(
     // BSc GENERAL
     // =====================================================================
     case "bsc-general": {
+      const { coreTheory: bscCoreTheory, corePractical: bscCorePrac, optional: bscOptional } =
+        partitionBsc(creditSubjects);
+      const pctCoreTheoryC = pctWithGrade(bscCoreTheory, 2.0);
+      const pctOptDPlus = pctWithGrade(bscOptional, 1.3);
+      const allCorePracCMinus = bscCorePrac.length === 0
+        ? true
+        : bscCorePrac.every((s) => s.gradeScale >= 1.7);
+
       reqs.push(
         {
           type: "computable",
@@ -322,21 +331,43 @@ function buildRequirements(
           target: 90,
           unit: "credits",
           met: confirmedCredits >= 90,
+          subjects: creditSubjects,
+          thresholdGS: 0.001,
         },
         {
-          type: "unavailable",
+          type: "computable",
           label: "60% of Core Courses (Theory) with C grade",
-          reason: CORE_OPT_REASON,
+          current: pctCoreTheoryC,
+          target: 60,
+          unit: "%",
+          met: pctCoreTheoryC >= 60,
+          detail: `${creditsWithMinGrade(bscCoreTheory, 2.0)} of ${totalCredits(bscCoreTheory)} core theory credits`,
+          subjects: bscCoreTheory,
+          thresholdGS: 2.0,
         },
         {
-          type: "unavailable",
+          type: "computable",
           label: "60% of Optional Course Units with D+ grade",
-          reason: CORE_OPT_REASON,
+          current: pctOptDPlus,
+          target: 60,
+          unit: "%",
+          met: pctOptDPlus >= 60,
+          detail: `${creditsWithMinGrade(bscOptional, 1.3)} of ${totalCredits(bscOptional)} optional credits`,
+          subjects: bscOptional,
+          thresholdGS: 1.3,
         },
         {
-          type: "unavailable",
+          type: "computable",
           label: "All Core Course Unit Practicals with C-",
-          reason: CORE_OPT_REASON + " " + THEORY_PRAC_REASON.replace("Cannot be calculated — o", "O"),
+          current: allCorePracCMinus ? bscCorePrac.length : bscCorePrac.filter((s) => s.gradeScale >= 1.7).length,
+          target: bscCorePrac.length,
+          unit: "courses",
+          met: allCorePracCMinus,
+          detail: bscCorePrac.length > 0
+            ? `${bscCorePrac.filter((s) => s.gradeScale >= 1.7).length} of ${bscCorePrac.length} core practicals passed`
+            : "No core practical courses found yet",
+          subjects: bscCorePrac,
+          thresholdGS: 1.7,
         },
         {
           type: "computable",
@@ -345,6 +376,8 @@ function buildRequirements(
           target: 2.0,
           unit: "GPA",
           met: gpa >= 2.0,
+          subjects: creditSubjects,
+          thresholdGS: 2.0,
         },
         engReq12()
       );
@@ -353,7 +386,7 @@ function buildRequirements(
         CS_PREFIXES.some((p) => s.subjectCode.toUpperCase().startsWith(p))
       );
       if (!hasCsSubs) {
-        const clcSubject = findSubject(subjects, ["clc", "computer literacy"]);
+        const clcSubject = findSubject(subjects, ["clc", "computer literacy", "ict1b13"]);
         reqs.push({
           type: "computable",
           label: "CLC (Computer Literacy Certificate)",
@@ -364,6 +397,8 @@ function buildRequirements(
           detail: clcSubject
             ? `${clcSubject.subjectCode}: ${clcSubject.grade}`
             : "Not found in results",
+          subjects: clcSubject ? [clcSubject] : [],
+          thresholdGS: 0.001,
         });
       }
       break;
@@ -381,6 +416,8 @@ function buildRequirements(
           target: 60,
           unit: "credits",
           met: confirmedCredits >= 60,
+          subjects: creditSubjects,
+          thresholdGS: 0.001,
         },
         {
           type: "unavailable",
@@ -391,12 +428,12 @@ function buildRequirements(
           type: "unavailable",
           label:
             "All Practical Course Units of specializing subject with C-",
-          reason: SPEC_SUBJECT_REASON + " " + THEORY_PRAC_REASON.replace("Cannot be calculated — o", "O"),
+          reason: SPEC_SUBJECT_REASON,
         },
         {
           type: "unavailable",
           label: "Other Practicals: D+ (Optional), C- (Core)",
-          reason: CORE_OPT_REASON + " " + THEORY_PRAC_REASON.replace("Cannot be calculated — o", "O"),
+          reason: SPEC_SUBJECT_REASON,
         },
         {
           type: "computable",
@@ -405,6 +442,8 @@ function buildRequirements(
           target: 2.0,
           unit: "GPA",
           met: gpa >= 2.0,
+          subjects: creditSubjects,
+          thresholdGS: 2.0,
         },
         {
           type: "unavailable",
@@ -445,7 +484,7 @@ function buildRequirements(
         {
           type: "unavailable",
           label: "All Practicals of specialization with C-",
-          reason: SPEC_SUBJECT_REASON + " " + THEORY_PRAC_REASON.replace("Cannot be calculated — o", "O"),
+          reason: SPEC_SUBJECT_REASON,
         },
         {
           type: "computable",
@@ -457,6 +496,8 @@ function buildRequirements(
           detail: researchProject
             ? `${researchProject.subjectCode} (${researchProject.subjectName}): ${researchProject.grade}`
             : "Not found in results yet",
+          subjects: researchProject ? [researchProject] : [],
+          thresholdGS: 2.0,
         },
         {
           type: "computable",
@@ -469,6 +510,8 @@ function buildRequirements(
             y4.length > 0
               ? `${creditsWithMinGrade(y4, 2.0)} of ${totalCredits(y4)} level-4 credits`
               : "No level-4 subjects found yet",
+          subjects: y4,
+          thresholdGS: 2.0,
         },
         engReq123()
       );
@@ -509,6 +552,8 @@ function buildRequirements(
           target: 90,
           unit: "credits",
           met: confirmedCredits >= 90,
+          subjects: creditSubjects,
+          thresholdGS: 0.001,
         },
         {
           type: "computable",
@@ -518,6 +563,8 @@ function buildRequirements(
           unit: "%",
           met: pctCsCoreC >= 60,
           detail: `${creditsWithMinGrade(bcsCoreCs, 2.0)} of ${totalCredits(bcsCoreCs)} CS core credits`,
+          subjects: bcsCoreCs,
+          thresholdGS: 2.0,
         },
         {
           type: "computable",
@@ -527,6 +574,8 @@ function buildRequirements(
           unit: "%",
           met: pctMathCoreC >= 60,
           detail: `${creditsWithMinGrade(bcsCoreMaths, 2.0)} of ${totalCredits(bcsCoreMaths)} Maths core credits`,
+          subjects: bcsCoreMaths,
+          thresholdGS: 2.0,
         },
         {
           type: "computable",
@@ -536,6 +585,8 @@ function buildRequirements(
           unit: "%",
           met: pctOptC >= 60,
           detail: `${creditsWithMinGrade(bcsOptional, 2.0)} of ${totalCredits(bcsOptional)} optional credits`,
+          subjects: bcsOptional,
+          thresholdGS: 2.0,
         },
         {
           type: "computable",
@@ -547,6 +598,8 @@ function buildRequirements(
           detail: industryPlacement
             ? `${industryPlacement.subjectCode} (${industryPlacement.subjectName}): ${industryPlacement.grade}`
             : "Not found in results yet",
+          subjects: industryPlacement ? [industryPlacement] : [],
+          thresholdGS: 2.0,
         },
         engReq12()
       );
@@ -577,6 +630,8 @@ function buildRequirements(
           target: 90,
           unit: "credits",
           met: confirmedCredits >= 90,
+          subjects: creditSubjects,
+          thresholdGS: 0.001,
         },
         {
           type: "computable",
@@ -586,6 +641,8 @@ function buildRequirements(
           unit: "%",
           met: pctCsBMinus >= 80,
           detail: `${creditsWithMinGrade(allCs, 2.7)} of ${totalCredits(allCs)} CS credits`,
+          subjects: allCs,
+          thresholdGS: 2.7,
         },
         {
           type: "computable",
@@ -595,6 +652,43 @@ function buildRequirements(
           unit: "%",
           met: pctMathC >= 60,
           detail: `${creditsWithMinGrade(allMaths, 2.0)} of ${totalCredits(allMaths)} Maths credits`,
+          subjects: allMaths,
+          thresholdGS: 2.0,
+        },
+        {
+          type: "computable",
+          label: "Level I & II Core Grades (all ≥ C)",
+          current: bcsCore.filter(s => {
+            const y = parseInt(s.subjectCode.replace(/^[A-Za-z]+/, "")[0], 10);
+            return (y === 1 || y === 2) && s.gradeScale >= 2.0;
+          }).length,
+          target: bcsCore.filter(s => {
+            const y = parseInt(s.subjectCode.replace(/^[A-Za-z]+/, "")[0], 10);
+            return (y === 1 || y === 2);
+          }).length,
+          unit: "units",
+          met: bcsCore.every(s => {
+            const y = parseInt(s.subjectCode.replace(/^[A-Za-z]+/, "")[0], 10);
+            if (y === 1 || y === 2) return s.gradeScale >= 2.0;
+            return true;
+          }),
+          detail: "All Level I and II core subjects must have at least a C grade",
+          subjects: bcsCore.filter(s => {
+            const y = parseInt(s.subjectCode.replace(/^[A-Za-z]+/, "")[0], 10);
+            return (y === 1 || y === 2);
+          }),
+          thresholdGS: 2.0,
+        },
+        {
+          type: "computable",
+          label: "CSC2123 Grade (≥ C)",
+          current: findSubject(subjects, ["CSC2123"])?.gradeScale || 0,
+          target: 2.0,
+          unit: "GPA",
+          met: (findSubject(subjects, ["CSC2123"])?.gradeScale || 0) >= 2.0,
+          detail: "CSC2123 (Object Oriented Programming) requirement",
+          subjects: subjects.filter(s => s.subjectCode.toUpperCase() === "CSC2123"),
+          thresholdGS: 2.0,
         },
         {
           type: "computable",
@@ -606,6 +700,8 @@ function buildRequirements(
           detail: industryPlacement
             ? `${industryPlacement.subjectCode} (${industryPlacement.subjectName}): ${industryPlacement.grade}`
             : "Not found in results yet",
+          subjects: industryPlacement ? [industryPlacement] : [],
+          thresholdGS: 2.0,
         },
         {
           type: "computable",
@@ -614,6 +710,8 @@ function buildRequirements(
           target: 2.0,
           unit: "GPA",
           met: gpa >= 2.0,
+          subjects: creditSubjects,
+          thresholdGS: 2.0,
         },
         engReq12()
       );
@@ -637,6 +735,8 @@ function buildRequirements(
           unit: "credits",
           met: confirmedCredits >= 120,
           detail: `Total: ${confirmedCredits} credits · 4th year: ${y4Credits} credits (need 30)`,
+          subjects: creditSubjects,
+          thresholdGS: 0.001,
         },
         {
           type: "computable",
@@ -645,6 +745,8 @@ function buildRequirements(
           target: 2.5,
           unit: "GPA",
           met: gpa >= 2.5,
+          subjects: creditSubjects,
+          thresholdGS: 2.5,
         },
         {
           type: "computable",
@@ -656,6 +758,8 @@ function buildRequirements(
           detail: researchProject
             ? `${researchProject.subjectCode} (${researchProject.subjectName}): ${researchProject.grade}`
             : "Not found in results yet",
+          subjects: researchProject ? [researchProject] : [],
+          thresholdGS: 2.0,
         },
         {
           type: "computable",
@@ -668,6 +772,8 @@ function buildRequirements(
             y4.length > 0
               ? `${creditsWithMinGrade(y4, 2.0)} of ${y4Credits} level-4 credits`
               : "No level-4 subjects found yet",
+          subjects: y4,
+          thresholdGS: 2.0,
         },
         engReq123()
       );
@@ -689,6 +795,8 @@ function buildRequirements(
       unit: "credits (A)",
       met: gpa >= 3.7 && credA >= 40,
       detail: `GPA: ${gpa.toFixed(2)} (need 3.70) · ${credA} credits with A-/A/A+`,
+      subjects: creditSubjects,
+      thresholdGS: 3.7,
     },
     {
       type: "computable",
@@ -698,6 +806,8 @@ function buildRequirements(
       unit: "credits (B)",
       met: gpa >= 3.3 && credB >= 40,
       detail: `GPA: ${gpa.toFixed(2)} (need 3.30) · ${credB} credits with B- or above`,
+      subjects: creditSubjects,
+      thresholdGS: 2.7,
     },
     {
       type: "computable",
@@ -707,6 +817,8 @@ function buildRequirements(
       unit: "credits (B)",
       met: gpa >= 3.0 && credB >= 40,
       detail: `GPA: ${gpa.toFixed(2)} (need 3.00) · ${credB} credits with B- or above`,
+      subjects: creditSubjects,
+      thresholdGS: 2.7,
     }
   );
 
@@ -717,7 +829,16 @@ function buildRequirements(
 // Requirement Card – computable
 // ---------------------------------------------------------------------------
 
-function ComputableCard({ req }: { req: ComputableRequirement }) {
+function ComputableCard({
+  req,
+  isOpen,
+  onToggle,
+}: {
+  req: ComputableRequirement;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+
   const pct =
     req.unit === "GPA"
       ? Math.min((req.current / 4.0) * 100, 100)
@@ -748,48 +869,98 @@ function ComputableCard({ req }: { req: ComputableRequirement }) {
       ? "bg-amber-50/50"
       : "bg-red-50/30";
 
+  const sortedSubjects = useMemo(() => {
+    if (!req.subjects) return [];
+    return [...req.subjects].sort((a, b) => {
+      const aPass = req.thresholdGS !== undefined ? a.gradeScale >= req.thresholdGS : true;
+      const bPass = req.thresholdGS !== undefined ? b.gradeScale >= req.thresholdGS : true;
+      if (aPass && !bPass) return -1;
+      if (!aPass && bPass) return 1;
+      return a.subjectCode.localeCompare(b.subjectCode);
+    });
+  }, [req.subjects, req.thresholdGS]);
+
   return (
     <div
-      className={`rounded-xl border border-gray-100 p-4 ${bgColor} transition-colors`}
+      className={`rounded-xl border border-gray-100 transition-all ${bgColor} overflow-hidden`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-xs font-semibold text-gray-700 leading-tight flex-1">
-          {req.label}
-        </p>
-        <StatusIcon className={`w-4 h-4 ${statusColor} flex-shrink-0 mt-0.5`} />
-      </div>
+      <div
+        className="p-4 cursor-pointer hover:bg-black/5"
+        onClick={() => req.subjects && req.subjects.length > 0 && onToggle()}
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <p className="text-xs font-semibold text-gray-700 leading-tight flex-1">
+            {req.label}
+          </p>
+          <div className="flex items-center gap-2">
+            <StatusIcon className={`w-4 h-4 ${statusColor} flex-shrink-0 mt-0.5`} />
+            {req.subjects && req.subjects.length > 0 && (
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            )}
+          </div>
+        </div>
 
-      <div className="flex items-end gap-2 mb-2">
-        <span className="text-xl font-bold text-gray-900">
-          {req.unit === "GPA"
-            ? req.current.toFixed(2)
-            : req.unit === "pass"
-              ? req.met
-                ? "Passed"
-                : "Pending"
-              : req.current}
-        </span>
-        {req.unit !== "pass" && (
-          <span className="text-xs text-gray-400 pb-0.5">
-            / {req.unit === "GPA" ? req.target.toFixed(2) : req.target}{" "}
-            {req.unit}
+        <div className="flex items-end gap-2 mb-2">
+          <span className="text-xl font-bold text-gray-900">
+            {req.unit === "GPA"
+              ? req.current.toFixed(2)
+              : req.unit === "pass"
+                ? req.met
+                  ? "Passed"
+                  : "Pending"
+                : req.current}
           </span>
+          {req.unit !== "pass" && (
+            <span className="text-xs text-gray-400 pb-0.5">
+              / {req.unit === "GPA" ? req.target.toFixed(2) : req.target}{" "}
+              {req.unit}
+            </span>
+          )}
+        </div>
+
+        <div className="w-full bg-gray-200/60 rounded-full h-1.5 overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+            className={`h-full rounded-full ${barColor}`}
+          />
+        </div>
+
+        {req.detail && !isOpen && (
+          <p className="text-[10px] text-gray-400 mt-1.5 leading-tight">
+            {req.detail}
+          </p>
         )}
       </div>
 
-      <div className="w-full bg-gray-200/60 rounded-full h-1.5 overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
-          className={`h-full rounded-full ${barColor}`}
-        />
-      </div>
-
-      {req.detail && (
-        <p className="text-[10px] text-gray-400 mt-1.5 leading-tight">
-          {req.detail}
-        </p>
+      {isOpen && req.subjects && (
+        <div className="px-4 pb-4 pt-1 border-t border-gray-100/50 bg-white/40">
+          <div className="space-y-1 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-bold text-gray-400 mb-2 mt-1">
+              <span>Included Subjects ({req.subjects.length})</span>
+              <span>Grade / Cr</span>
+            </div>
+            {sortedSubjects.map((s, idx) => {
+              const fulfills = req.thresholdGS !== undefined ? s.gradeScale >= req.thresholdGS : true;
+              return (
+                <div key={idx} className="flex items-center justify-between gap-2 py-1.5 border-b border-gray-100/50 last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${fulfills ? "bg-emerald-400" : "bg-red-400"}`} />
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold text-gray-700 truncate">{s.subjectCode}</p>
+                      <p className="text-[9px] text-gray-500 truncate">{s.subjectName}</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-[11px] font-bold ${fulfills ? 'text-emerald-600' : 'text-red-500'}`}>{s.grade}</p>
+                    <p className="text-[9px] text-gray-400">{s.credit > 0 ? `${s.credit} Cr` : 'N/C'}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -872,6 +1043,7 @@ export default function DegreeProgress({
   );
 
   const [degreeType, setDegreeType] = useState<DegreeType>("bcs-general");
+  const [openCardId, setOpenCardId] = useState<string | null>(null);
 
   useEffect(() => {
     const defaultType: DegreeType = isBcs ? "bcs-general" : "bsc-general";
@@ -1025,24 +1197,38 @@ export default function DegreeProgress({
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3">
           Degree Requirements
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {baseReqs.map((req, i) =>
-            req.type === "computable" ? (
-              <ComputableCard key={`${degreeType}-base-${i}`} req={req} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
+          {baseReqs.map((req, i) => {
+            const id = `base-${i}`;
+            return req.type === "computable" ? (
+              <ComputableCard
+                key={`${degreeType}-base-${i}`}
+                req={req}
+                isOpen={openCardId === id}
+                onToggle={() => setOpenCardId(openCardId === id ? null : id)}
+              />
             ) : (
               <UnavailableCard key={`${degreeType}-base-${i}`} req={req} />
-            )
-          )}
+            );
+          })}
         </div>
 
         {/* Honours classification */}
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-5 mb-3">
           Honours Classification
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {honoursReqs.map((req, i) => (
-            <ComputableCard key={`${degreeType}-hon-${i}`} req={req} />
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-start">
+          {honoursReqs.map((req, i) => {
+            const id = `hon-${i}`;
+            return (
+              <ComputableCard
+                key={`${degreeType}-hon-${i}`}
+                req={req}
+                isOpen={openCardId === id}
+                onToggle={() => setOpenCardId(openCardId === id ? null : id)}
+              />
+            );
+          })}
         </div>
       </div>
     </div>

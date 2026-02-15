@@ -9,6 +9,7 @@ import {
   CACHE_KEYS,
 } from "../services/dataCache";
 import type { HomeData, GpaResults, NoticesData } from "../types";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardFooter from "../components/dashboard/DashboardFooter";
@@ -21,6 +22,7 @@ import GpaSummaryCard from "../components/home/GpaSummaryCard";
 
 export default function Home() {
   const { session, username, signOut, consumeInitialResults } = useAuth();
+  usePageTitle("Home");
 
   // ---------------------------------------------------------------------------
   // State — ALL seeded from centralized cache for instant render on navigation

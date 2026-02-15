@@ -49,16 +49,21 @@ function makeGridPolygon(level: number, count: number): string {
 }
 
 export default function DepartmentRadar({ results }: DepartmentRadarProps) {
-  const values = DEPARTMENTS.map((d) => {
+  // Filter to only departments where the student has a GPA
+  const activeDepts = DEPARTMENTS.filter((d) => {
+    const v = parseFloat((results[d.key] as string) ?? "");
+    return !isNaN(v) && v > 0;
+  });
+
+  // Only render if at least 3 departments have data
+  if (activeDepts.length < 3) return null;
+
+  const values = activeDepts.map((d) => {
     const v = parseFloat((results[d.key] as string) ?? "");
     return isNaN(v) ? 0 : v;
   });
 
-  // Only render if at least 3 departments have data
-  const validCount = values.filter((v) => v > 0).length;
-  if (validCount < 3) return null;
-
-  const step = 360 / DEPARTMENTS.length;
+  const step = 360 / activeDepts.length;
   const dataPolygon = makePolygon(values);
 
   return (
@@ -75,7 +80,7 @@ export default function DepartmentRadar({ results }: DepartmentRadarProps) {
         {[1, 2, 3, 4].map((level) => (
           <polygon
             key={level}
-            points={makeGridPolygon(level, DEPARTMENTS.length)}
+            points={makeGridPolygon(level, activeDepts.length)}
             fill="none"
             stroke="#e5e7eb"
             strokeWidth="0.75"
@@ -83,7 +88,7 @@ export default function DepartmentRadar({ results }: DepartmentRadarProps) {
         ))}
 
         {/* Axis lines */}
-        {DEPARTMENTS.map((_, i) => {
+        {activeDepts.map((_, i) => {
           const { x, y } = polarToCart(i * step, MAX_R);
           return (
             <line
@@ -130,7 +135,7 @@ export default function DepartmentRadar({ results }: DepartmentRadarProps) {
         })}
 
         {/* Labels */}
-        {DEPARTMENTS.map((dept, i) => {
+        {activeDepts.map((dept, i) => {
           const labelR = MAX_R + 18;
           const { x, y } = polarToCart(i * step, labelR);
           return (

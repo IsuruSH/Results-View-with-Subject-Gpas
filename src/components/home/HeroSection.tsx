@@ -61,7 +61,7 @@ export default function HeroSection({
         {/* Welcome text */}
         <div className="flex-1 min-w-0">
           <p className="text-sm text-indigo-200/80">Welcome back,</p>
-          <h2 className="text-2xl sm:text-3xl font-bold truncate mt-0.5">
+          <h2 className="text-2xl sm:text-3xl font-bold break-words mt-0.5">
             {studentName || "Student"}
           </h2>
           {username && (

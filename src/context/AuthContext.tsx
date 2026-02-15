@@ -15,6 +15,10 @@ import {
   clearProfileImage,
   getProfileImage,
 } from "../services/dataCache";
+import {
+  encryptForSession,
+  clearSessionKey,
+} from "../utils/sessionCrypto";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -48,7 +52,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Store credentials so useFosmisSession can auto-login in the browser
     sessionStorage.setItem("fosmis_uname", rawUsername);
-    sessionStorage.setItem("fosmis_upwd", password);
+    // Encrypt password before storing (key lives only in memory)
+    encryptForSession(password).then(({ ciphertext, iv }) => {
+      sessionStorage.setItem("fosmis_upwd_enc", ciphertext);
+      sessionStorage.setItem("fosmis_upwd_iv", iv);
+    });
 
     // Pre-cache profile image URL
     const imgUrl = getProfileImage(formattedUsername);
@@ -80,9 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("PHPSESSID");
       localStorage.removeItem("username");
       sessionStorage.removeItem("fosmis_uname");
-      sessionStorage.removeItem("fosmis_upwd");
+      sessionStorage.removeItem("fosmis_upwd_enc");
+      sessionStorage.removeItem("fosmis_upwd_iv");
       sessionStorage.removeItem("fosmis_browser_authed");
       sessionStorage.removeItem("homeGpaCache");
+      clearSessionKey();
       clearCache();
       clearProfileImage();
       setSession(null);

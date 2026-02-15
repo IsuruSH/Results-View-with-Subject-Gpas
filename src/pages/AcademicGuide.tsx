@@ -16,12 +16,14 @@ import {
   Trophy,
   Building2,
   Layers,
+  AlertTriangle,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 import { fetchResults, fetchCourseRegistration } from "../services/api";
 import { getProfileImage, getCached, CACHE_KEYS } from "../services/dataCache";
 import type { GpaResults, CourseRegistrationData } from "../types";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardFooter from "../components/dashboard/DashboardFooter";
@@ -968,6 +970,7 @@ function CollapsibleSection({
 export default function AcademicGuide() {
   const { session, username, signOut } = useAuth();
   const navigate = useNavigate();
+  usePageTitle("Academic Guide");
   const [profileImage] = useState<string | null>(() =>
     getProfileImage(username)
   );
@@ -1108,6 +1111,7 @@ export default function AcademicGuide() {
             scale, GPA calculation, and degree completion requirements. All
             information is based on the Faculty of Science guidelines.
           </p>
+
         </motion.div>
 
         {/* Degree Progress - THE MOST IMPORTANT SECTION */}

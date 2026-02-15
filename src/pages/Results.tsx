@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { fetchResults, calculateGPA } from "../services/api";
 import { getProfileImage, getCached, CACHE_KEYS } from "../services/dataCache";
 import type { GpaFormData, GpaResults, RepeatedSubject } from "../types";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 // Layout
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -30,6 +31,7 @@ import ExcelExport from "../components/dashboard/ExcelExport";
 
 export default function Results() {
   const { signOut, username, session, consumeInitialResults } = useAuth();
+  usePageTitle("Results");
   const [rlevel, setRlevel] = useState("4");
 
   // Seed results from centralized cache for instant render on re-navigation
@@ -164,11 +166,11 @@ export default function Results() {
     const filteredRepeated =
       includeRepeated && repeatedSubjects.length > 0
         ? {
-            subjects: repeatedSubjects.map((s) => s.subjectCode),
-            grades: repeatedSubjects.map(
-              (s) => editableGrades[s.subjectCode]
-            ),
-          }
+          subjects: repeatedSubjects.map((s) => s.subjectCode),
+          grades: repeatedSubjects.map(
+            (s) => editableGrades[s.subjectCode]
+          ),
+        }
         : { subjects: [], grades: [] };
 
     if (

@@ -1,3 +1,5 @@
+import { decryptFromSession } from "./sessionCrypto";
+
 const FOSMIS_LOGIN_URL = "https://paravi.ruh.ac.lk/fosmis/login.php";
 
 /**
@@ -6,9 +8,10 @@ const FOSMIS_LOGIN_URL = "https://paravi.ruh.ac.lk/fosmis/login.php";
  * and then redirects to the target URL. Subsequent calls open the link
  * directly since the browser already has an authenticated PHPSESSID cookie.
  *
- * Credentials are read from sessionStorage (stored during our login flow).
+ * Credentials are read from sessionStorage (encrypted) and decrypted
+ * in-memory using the per-session AES key.
  */
-export function openFosmisPage(targetUrl: string): void {
+export async function openFosmisPage(targetUrl: string): Promise<void> {
   // If we already authenticated FOSMIS in this browser session, open directly
   if (sessionStorage.getItem("fosmis_browser_authed")) {
     window.open(targetUrl, "_blank", "noopener,noreferrer");
@@ -16,10 +19,21 @@ export function openFosmisPage(targetUrl: string): void {
   }
 
   const uname = sessionStorage.getItem("fosmis_uname") || "";
-  const upwd = sessionStorage.getItem("fosmis_upwd") || "";
+  const enc = sessionStorage.getItem("fosmis_upwd_enc") || "";
+  const iv = sessionStorage.getItem("fosmis_upwd_iv") || "";
 
   // No credentials available — fall back to direct open (user will see login page)
-  if (!uname || !upwd) {
+  if (!uname || !enc || !iv) {
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  // Decrypt password in memory
+  let upwd: string;
+  try {
+    upwd = await decryptFromSession(enc, iv);
+  } catch {
+    // Decryption failed (e.g. key was lost after refresh) — fall back
     window.open(targetUrl, "_blank", "noopener,noreferrer");
     return;
   }

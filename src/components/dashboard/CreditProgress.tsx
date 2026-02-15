@@ -18,7 +18,8 @@ export default function CreditProgress({
   if (credits === 0) return null;
 
   const target = DEGREE_CREDIT_TARGETS[degreeIdx].credits;
-  const pct = Math.min((credits / target) * 100, 100);
+  const pct = (credits / target) * 100;
+  const barPct = Math.min(pct, 100);
   const remaining = Math.max(target - credits, 0);
 
   const barColor =
@@ -45,11 +46,10 @@ export default function CreditProgress({
             <button
               key={dt.label}
               onClick={() => setDegreeIdx(idx)}
-              className={`px-3 py-1 text-xs font-medium transition-colors ${
-                degreeIdx === idx
+              className={`px-3 py-1 text-xs font-medium transition-colors ${degreeIdx === idx
                   ? "bg-indigo-600 text-white"
                   : "text-gray-500 hover:bg-gray-50"
-              }`}
+                }`}
             >
               {dt.label}
             </button>
@@ -61,7 +61,7 @@ export default function CreditProgress({
       <div className="relative w-full bg-gray-100 rounded-full h-4 overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
+          animate={{ width: `${barPct}%` }}
           transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
           className={`h-full rounded-full ${barColor}`}
         />
@@ -73,7 +73,9 @@ export default function CreditProgress({
       <p className="mt-2 text-xs text-gray-400">
         {remaining > 0
           ? `${remaining} credits remaining to complete your degree`
-          : "You have completed all required credits!"}
+          : credits > target
+            ? `${credits - target} credits above the requirement — great progress!`
+            : "You have completed all required credits!"}
       </p>
     </motion.div>
   );

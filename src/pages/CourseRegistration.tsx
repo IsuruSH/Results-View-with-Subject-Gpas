@@ -15,6 +15,7 @@ import { fetchCourseRegistration } from "../services/api";
 import { getProfileImage, getCached, CACHE_KEYS } from "../services/dataCache";
 import type { CourseRegistrationData, RegisteredCourse } from "../types";
 import { DEGREE_CREDIT_TARGETS } from "../constants/grades";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardFooter from "../components/dashboard/DashboardFooter";
@@ -60,6 +61,7 @@ function getCreditFromCode(code: string): number {
 export default function CourseRegistration() {
   const { session, username, signOut } = useAuth();
   const navigate = useNavigate();
+  usePageTitle("Course Registration");
   // Seed from centralized cache for instant render
   const [data, setData] = useState<CourseRegistrationData | null>(
     () => getCached<CourseRegistrationData>(CACHE_KEYS.courseReg)
@@ -243,11 +245,10 @@ export default function CourseRegistration() {
                     <button
                       key={dt.label}
                       onClick={() => setDegreeIdx(idx)}
-                      className={`px-3 py-1 text-xs font-medium transition-colors ${
-                        degreeIdx === idx
+                      className={`px-3 py-1 text-xs font-medium transition-colors ${degreeIdx === idx
                           ? "bg-indigo-600 text-white"
                           : "text-gray-500 hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       {dt.label}
                     </button>
@@ -428,9 +429,8 @@ function CourseRow({
 
   return (
     <tr
-      className={`hover:bg-gray-50/50 transition-colors ${
-        isNonDegree ? "bg-amber-50/40" : ""
-      }`}
+      className={`hover:bg-gray-50/50 transition-colors ${isNonDegree ? "bg-amber-50/40" : ""
+        }`}
     >
       <td className="px-5 py-2.5 font-mono text-xs font-semibold text-gray-700">
         {course.code}

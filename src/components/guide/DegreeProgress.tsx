@@ -933,6 +933,15 @@ export default function DegreeProgress({
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       {/* Header */}
+      <div className="mb-3 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+        <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-amber-800 leading-relaxed">
+          <span className="font-semibold">Disclaimer:</span> The requirements listed below are
+          for informational purposes only and may not reflect the latest official regulations.
+          Always refer to the official Faculty of Science handbook or consult your academic
+          advisor for accurate and up-to-date information.
+        </p>
+      </div>
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-4 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -968,11 +977,10 @@ export default function DegreeProgress({
                         setDegreeType(p.id);
                         setShowPicker(false);
                       }}
-                      className={`w-full text-left px-4 py-2 text-xs transition-colors ${
-                        p.id === degreeType
-                          ? "bg-indigo-50 text-indigo-700 font-semibold"
-                          : "text-gray-700 hover:bg-gray-50"
-                      }`}
+                      className={`w-full text-left px-4 py-2 text-xs transition-colors ${p.id === degreeType
+                        ? "bg-indigo-50 text-indigo-700 font-semibold"
+                        : "text-gray-700 hover:bg-gray-50"
+                        }`}
                     >
                       {p.label}
                     </button>
@@ -1001,13 +1009,12 @@ export default function DegreeProgress({
               initial={{ width: 0 }}
               animate={{ width: `${overallPct}%` }}
               transition={{ duration: 1, ease: "easeOut" }}
-              className={`h-full rounded-full ${
-                overallPct >= 80
-                  ? "bg-emerald-400"
-                  : overallPct >= 50
-                    ? "bg-amber-400"
-                    : "bg-red-400"
-              }`}
+              className={`h-full rounded-full ${overallPct >= 80
+                ? "bg-emerald-400"
+                : overallPct >= 50
+                  ? "bg-amber-400"
+                  : "bg-red-400"
+                }`}
             />
           </div>
         </div>

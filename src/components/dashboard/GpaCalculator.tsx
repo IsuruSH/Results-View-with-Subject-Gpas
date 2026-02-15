@@ -16,6 +16,7 @@ export default function GpaCalculator({
   onSubmit,
 }: GpaCalculatorProps) {
   const [showInstructions, setShowInstructions] = useState(false);
+  const [errors, setErrors] = useState<Record<number, string>>({});
 
   const addSubjectField = () => {
     setGpaFormData((prev) => ({
@@ -78,9 +79,8 @@ export default function GpaCalculator({
             <Info className="w-3.5 h-3.5" />
             How to use
             <ChevronDown
-              className={`w-3 h-3 transition-transform ${
-                showInstructions ? "rotate-180" : ""
-              }`}
+              className={`w-3 h-3 transition-transform ${showInstructions ? "rotate-180" : ""
+                }`}
             />
           </button>
         </div>
@@ -132,12 +132,20 @@ export default function GpaCalculator({
             <div key={index} className="flex items-center gap-3">
               <input
                 type="text"
+                id={`subject-code-${index}`}
+                name={`subject-code-${index}`}
                 placeholder="Subject Code"
                 value={subject}
-                onChange={(e) => updateSubject(index, e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300 transition-all"
+                onChange={(e) => {
+                  updateSubject(index, e.target.value);
+                  if (e.target.value) setErrors((prev) => { const n = { ...prev }; delete n[index]; return n; });
+                }}
+                className={`flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300 transition-all ${errors[index] ? "border-red-300 bg-red-50" : "border-gray-200"
+                  }`}
               />
               <select
+                id={`subject-grade-${index}`}
+                name={`subject-grade-${index}`}
                 value={gpaFormData.manualSubjects.grades[index]}
                 onChange={(e) => updateGrade(index, e.target.value)}
                 className="w-24 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300 transition-all"

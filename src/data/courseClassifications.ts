@@ -9,6 +9,9 @@ export type CourseType = "core" | "optional";
 /** The nature of a course unit */
 export type CourseNature = "theory" | "practical" | "combined" | "project";
 
+/** Student program groups for classification overrides */
+export type StudentGroup = "bcs" | "bsc";
+
 export interface CourseUnit {
     code: string;
     name: string;
@@ -31,12 +34,16 @@ function n(code: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Master lookup map: normalised-code → { type, nature }
+// Master lookup map: "key:normalised-code" → { type, nature }
+// key is either "global" or a specific "StudentGroup"
 // ---------------------------------------------------------------------------
 const COURSE_MAP = new Map<string, { type: CourseType; nature: CourseNature }>();
 
-function reg(code: string, type: CourseType, nature: CourseNature) {
-    COURSE_MAP.set(n(code), { type, nature });
+/** Register a course classification. If group is omitted, it is registered as global. */
+function reg(code: string, type: CourseType, nature: CourseNature, group?: StudentGroup) {
+    const normalised = n(code);
+    const key = group ? `${group}:${normalised}` : `global:${normalised}`;
+    COURSE_MAP.set(key, { type, nature });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -69,7 +76,7 @@ reg("CSC2133", "core", "theory");
 reg("CSC2143", "core", "combined");
 reg("AMT212β", "core", "theory");
 reg("MAT211β", "core", "theory");
-reg("PHY2112", "optional", "theory"); // optional for BCS per handbook
+reg("PHY2112", "core", "theory", "bcs"); // explicitly optional for BCS
 
 // Level 2 – Semester 2
 reg("CSC2213", "core", "combined");
@@ -89,6 +96,8 @@ reg("CSC3122", "optional", "theory");
 reg("CSC3132", "optional", "theory");
 reg("CSC3142", "optional", "theory");
 reg("CSC3152", "optional", "combined");
+reg("MAT313β", "optional", "combined", "bcs"); // Optional for BCS
+reg("MAT313β", "core", "theory", "bsc"); // Core for B.Sc.
 
 // Level 3 – Semester 2
 reg("CSC3216", "core", "practical");
@@ -299,7 +308,7 @@ reg("MAT225β", "core", "theory");
 // Level 3 – Semester 1
 reg("MAT311β", "core", "theory");
 reg("MAT312β", "core", "theory"); // one-of options
-reg("MAT313β", "core", "theory");
+// MAT313β handled separately above for BCS/BSC
 // Level 3 – Semester 2 (all optional)
 reg("MAT321β", "optional", "theory");
 reg("MAT322β", "optional", "theory");
@@ -514,48 +523,51 @@ reg("ENG3b10", "core", "theory");
 // ---------------------------------------------------------------------------
 
 /**
- * Look up the classification of a course by its code.
- * Returns `undefined` if the code is not in the handbook dataset.
+ * Look up the classification of a course by its code and group.
+ * Defaults to "bsc" if group is omitted.
  */
 export function getCourseClassification(
-    code: string
+    code: string,
+    group: StudentGroup = "bsc"
 ): { type: CourseType; nature: CourseNature } | undefined {
-    return COURSE_MAP.get(n(code));
+    const normalised = n(code);
+    return COURSE_MAP.get(`${group}:${normalised}`) || COURSE_MAP.get(`global:${normalised}`);
 }
 
 /** Is the course classified as core (compulsory)? Defaults to false if unknown. */
-export function isCoreCourse(code: string): boolean {
-    return COURSE_MAP.get(n(code))?.type === "core";
+export function isCoreCourse(code: string, group: StudentGroup = "bsc"): boolean {
+    return getCourseClassification(code, group)?.type === "core";
 }
 
 /** Is the course classified as optional? Defaults to false if unknown. */
-export function isOptionalCourse(code: string): boolean {
-    return COURSE_MAP.get(n(code))?.type === "optional";
+export function isOptionalCourse(code: string, group: StudentGroup = "bsc"): boolean {
+    return getCourseClassification(code, group)?.type === "optional";
 }
 
 /** Is the course a pure theory course? */
-export function isTheoryCourse(code: string): boolean {
-    return COURSE_MAP.get(n(code))?.nature === "theory";
+export function isTheoryCourse(code: string, group: StudentGroup = "bsc"): boolean {
+    return getCourseClassification(code, group)?.nature === "theory";
 }
 
 /** Is the course a pure practical course? */
-export function isPracticalCourse(code: string): boolean {
-    return COURSE_MAP.get(n(code))?.nature === "practical";
+export function isPracticalCourse(code: string, group: StudentGroup = "bsc"): boolean {
+    return getCourseClassification(code, group)?.nature === "practical";
 }
 
 /** Is the course a combined (theory + practical) course? */
-export function isCombinedCourse(code: string): boolean {
-    return COURSE_MAP.get(n(code))?.nature === "combined";
+export function isCombinedCourse(code: string, group: StudentGroup = "bsc"): boolean {
+    return getCourseClassification(code, group)?.nature === "combined";
 }
 
 /** Is the course a project course? */
-export function isProjectCourse(code: string): boolean {
-    return COURSE_MAP.get(n(code))?.nature === "project";
+export function isProjectCourse(code: string, group: StudentGroup = "bsc"): boolean {
+    return getCourseClassification(code, group)?.nature === "project";
 }
 
-/** Check if any classification data exists for the given code */
-export function isKnownCourse(code: string): boolean {
-    return COURSE_MAP.has(n(code));
+/** Check if any classification data exists for the given code (specifically for the group or globally) */
+export function isKnownCourse(code: string, group: StudentGroup = "bsc"): boolean {
+    const normalised = n(code);
+    return COURSE_MAP.has(`${group}:${normalised}`) || COURSE_MAP.has(`global:${normalised}`);
 }
 
 /**
@@ -563,17 +575,17 @@ export function isKnownCourse(code: string): boolean {
  * "Theory" = pure theory courses
  * "Practical" = pure practical + combined + project (anything with a practical component)
  */
-export function hasTheoryComponent(code: string): boolean {
-    const cls = COURSE_MAP.get(n(code));
+export function hasTheoryComponent(code: string, group: StudentGroup = "bsc"): boolean {
+    const cls = getCourseClassification(code, group);
     if (!cls) return false;
     return cls.nature === "theory" || cls.nature === "combined";
 }
 
-export function hasPracticalComponent(code: string): boolean {
-    const cls = COURSE_MAP.get(n(code));
+export function hasPracticalComponent(code: string, group: StudentGroup = "bsc"): boolean {
+    const cls = getCourseClassification(code, group);
     if (!cls) return false;
     return cls.nature === "practical" || cls.nature === "combined" || cls.nature === "project";
 }
 
-/** Total number of classified courses in the dataset */
-export const TOTAL_CLASSIFIED_COURSES = COURSE_MAP.size;
+/** Total number of unique course classifications in the dataset (global entries) */
+export const TOTAL_CLASSIFIED_COURSES = Array.from(COURSE_MAP.keys()).filter(k => k.startsWith("global:")).length;

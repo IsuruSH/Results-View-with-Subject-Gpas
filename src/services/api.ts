@@ -139,6 +139,49 @@ export async function fetchNotices(sessionId: string) {
   });
 }
 
+/**
+ * Stream notices from the server via SSE.
+ */
+export async function streamNotices(
+  sessionId: string,
+  onNotice: (type: "recent" | "previous", notice: any) => void,
+  onDone: () => void
+) {
+  const response = await fetch(`${SERVER_URL}/notices/stream`, {
+    headers: { authorization: sessionId },
+    credentials: "include",
+  });
+
+  if (!response.body) return;
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        try {
+          const { type, notice } = JSON.parse(line.slice(6));
+          onNotice(type, notice);
+        } catch {
+          // ignore parse errors on partial data
+        }
+      } else if (line.startsWith("event: done")) {
+        onDone();
+      }
+    }
+  }
+  onDone();
+}
+
 // ---------------------------------------------------------------------------
 // GPA calculator — never cached (user-submitted data)
 // ---------------------------------------------------------------------------

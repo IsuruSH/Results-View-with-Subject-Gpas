@@ -17,6 +17,7 @@ import {
   hasTheoryComponent,
   hasPracticalComponent,
   isKnownCourse,
+  type StudentGroup,
 } from "../../data/courseClassifications";
 
 // ---------------------------------------------------------------------------
@@ -193,7 +194,7 @@ function partitionBcs(creditSubjects: SubjectBreakdownRow[]) {
   const core: SubjectBreakdownRow[] = [];
   const optional: SubjectBreakdownRow[] = [];
   for (const s of creditSubjects) {
-    if (isCoreCourse(s.subjectCode)) core.push(s);
+    if (isCoreCourse(s.subjectCode, "bcs")) core.push(s);
     else optional.push(s);
   }
   return { core, optional };
@@ -222,16 +223,18 @@ function partitionBsc(creditSubjects: SubjectBreakdownRow[]) {
   const corePractical: SubjectBreakdownRow[] = []; // practical or combined core
   const optional: SubjectBreakdownRow[] = [];
   const unknown: SubjectBreakdownRow[] = [];
+  const group: StudentGroup = "bsc";
+
   for (const s of creditSubjects) {
     const code = s.subjectCode;
-    if (!isKnownCourse(code)) {
+    if (!isKnownCourse(code, group)) {
       unknown.push(s);
       continue;
     }
-    if (isCoreCourse(code)) {
-      if (hasPracticalComponent(code) && !hasTheoryComponent(code)) {
+    if (isCoreCourse(code, group)) {
+      if (hasPracticalComponent(code, group) && !hasTheoryComponent(code, group)) {
         corePractical.push(s);
-      } else if (hasPracticalComponent(code)) {
+      } else if (hasPracticalComponent(code, group)) {
         // combined: counts for both checks
         coreTheory.push(s);
         corePractical.push(s);

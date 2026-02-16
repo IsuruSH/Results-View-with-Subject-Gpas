@@ -10,12 +10,14 @@ import {
   Search,
   Sparkles,
   Clock,
+  ExternalLink,
 } from "lucide-react";
 import type { Notice, NoticesData } from "../../types";
 import NoticeViewer from "./NoticeViewer";
 
 interface NoticeBoardProps {
   noticesData: NoticesData | null;
+  sessionId: string | null;
   loading?: boolean;
 }
 
@@ -25,6 +27,7 @@ const FILE_TYPE_CONFIG: Record<
 > = {
   pdf: { color: "text-red-700", bg: "bg-red-100", icon: FileText },
   docx: { color: "text-blue-700", bg: "bg-blue-100", icon: FileSpreadsheet },
+  html: { color: "text-amber-700", bg: "bg-amber-100", icon: ExternalLink },
   png: { color: "text-green-700", bg: "bg-green-100", icon: ImageIcon },
   jpg: { color: "text-green-700", bg: "bg-green-100", icon: ImageIcon },
   other: { color: "text-gray-700", bg: "bg-gray-100", icon: FileText },
@@ -109,7 +112,7 @@ function NoticeCard({
   );
 }
 
-export default function NoticeBoard({ noticesData, loading }: NoticeBoardProps) {
+export default function NoticeBoard({ noticesData, sessionId, loading }: NoticeBoardProps) {
   const [activeTab, setActiveTab] = useState<"recent" | "previous">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingNotice, setViewingNotice] = useState<Notice | null>(null);
@@ -127,16 +130,16 @@ export default function NoticeBoard({ noticesData, loading }: NoticeBoardProps) 
     );
   }
 
-  const recent = noticesData?.recentNotices || [];
-  const previous = noticesData?.previousNotices || [];
+  const recent = Array.isArray(noticesData?.recentNotices) ? noticesData.recentNotices : [];
+  const previous = Array.isArray(noticesData?.previousNotices) ? noticesData.previousNotices : [];
   const notices = activeTab === "recent" ? recent : previous;
   const totalCount = recent.length + previous.length;
 
   // Filter by search
   const filtered = searchQuery
     ? notices.filter((n) =>
-        n.title.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      n && n.title && n.title.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : notices;
 
   return (
@@ -168,22 +171,20 @@ export default function NoticeBoard({ noticesData, loading }: NoticeBoardProps) 
           <div className="flex rounded-lg border border-gray-200 overflow-hidden flex-shrink-0">
             <button
               onClick={() => setActiveTab("recent")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeTab === "recent"
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === "recent"
+                ? "bg-indigo-600 text-white"
+                : "text-gray-500 hover:bg-gray-50"
+                }`}
             >
               <Sparkles className="w-3 h-3" />
               Recent ({recent.length})
             </button>
             <button
               onClick={() => setActiveTab("previous")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                activeTab === "previous"
-                  ? "bg-indigo-600 text-white"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === "previous"
+                ? "bg-indigo-600 text-white"
+                : "text-gray-500 hover:bg-gray-50"
+                }`}
             >
               <Clock className="w-3 h-3" />
               Previous ({previous.length})
@@ -244,6 +245,7 @@ export default function NoticeBoard({ noticesData, loading }: NoticeBoardProps) 
       {viewingNotice && (
         <NoticeViewer
           notice={viewingNotice}
+          sessionId={sessionId}
           onClose={() => setViewingNotice(null)}
         />
       )}

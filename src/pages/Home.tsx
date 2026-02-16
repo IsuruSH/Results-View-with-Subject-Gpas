@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { fetchHomeData, fetchNotices } from "../services/api";
+import { fetchHomeData, streamNotices } from "../services/api";
 import {
   getProfileImage,
   setProfileImage as cacheProfileImage,
   getCached,
+  setCached,
   CACHE_KEYS,
 } from "../services/dataCache";
 import type { HomeData, GpaResults, NoticesData } from "../types";
@@ -30,9 +31,19 @@ export default function Home() {
   const [homeData, setHomeData] = useState<HomeData | null>(
     () => getCached<HomeData>(CACHE_KEYS.homeData)
   );
-  const [noticesData, setNoticesData] = useState<NoticesData | null>(
-    () => getCached<NoticesData>(CACHE_KEYS.notices)
-  );
+  const [noticesData, setNoticesData] = useState<NoticesData>({
+    recentNotices: [],
+    previousNotices: [],
+  });
+
+  // Seeds noticesData from cache on mount
+  useEffect(() => {
+    const cached = getCached<NoticesData>(CACHE_KEYS.notices);
+    if (cached) {
+      setNoticesData(cached);
+      setNoticesLoading(false);
+    }
+  }, []);
   const [cachedResults, setCachedResults] = useState<GpaResults | null>(() => {
     if (username) {
       const mem = getCached<GpaResults>(CACHE_KEYS.results(username, "4"));
@@ -91,13 +102,39 @@ export default function Home() {
       .catch(() => toast.error("Error loading home data"))
       .finally(() => setLoading(false));
 
-    // Fire notices fetch independently — renders when ready, doesn't block hero/mentor
-    fetchNotices(session)
-      .then((data) => setNoticesData(data))
-      .catch(() => {
-        /* silent — notices section just shows loading */
-      })
-      .finally(() => setNoticesLoading(false));
+    // Fire notices fetch independently — renders incrementally as data streams in
+    streamNotices(
+      session,
+      (type: "recent" | "previous", notice: any) => {
+        if (!notice || !type || !notice.title || !notice.date) return;
+        setNoticesLoading(false);
+        setNoticesData((prev) => {
+          if (!prev) return { recentNotices: [notice], previousNotices: [] }; // should not happen with fixed initialization
+
+          const listName = type === "recent" ? "recentNotices" : "previousNotices";
+          const currentList = prev[listName] || [];
+
+          // Check for exact duplicates (SSE might re-send if connection flaps)
+          if (currentList.some((n: any) => n && n.title === notice.title && n.date === notice.date))
+            return prev;
+
+          const next = {
+            ...prev,
+            [listName]: [...currentList, notice],
+          };
+
+          // Sync to cache for next load
+          setCached(CACHE_KEYS.notices, next);
+          return next;
+        });
+      },
+      () => {
+        setNoticesLoading(false);
+      }
+    ).catch((err) => {
+      console.error("Notice streaming failed:", err);
+      setNoticesLoading(false);
+    });
   }, [session, username, consumeInitialResults]);
 
   return (
@@ -124,7 +161,7 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-6">
             <QuickActions />
             <AcademicServices />
-            <NoticeBoard noticesData={noticesData} loading={noticesLoading} />
+            <NoticeBoard noticesData={noticesData} sessionId={session} loading={noticesLoading} />
           </div>
 
           {/* Right column - 1/3 */}

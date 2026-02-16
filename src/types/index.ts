@@ -86,7 +86,8 @@ export interface Notice {
   time: string;
   title: string;
   fileUrl: string;
-  fileType: "pdf" | "docx" | "png" | "jpg" | "other";
+  fileType: "pdf" | "docx" | "png" | "jpg" | "html" | "other";
+  content?: string;
 }
 
 export interface NoticesData {

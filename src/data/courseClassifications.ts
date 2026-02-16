@@ -69,7 +69,7 @@ reg("CSC2133", "core", "theory");
 reg("CSC2143", "core", "combined");
 reg("AMT212β", "core", "theory");
 reg("MAT211β", "core", "theory");
-reg("PHY2112", "optional", "theory"); // optional for BCS per handbook
+reg("PHY2112", "core", "theory"); // optional for BCS per handbook
 
 // Level 2 – Semester 2
 reg("CSC2213", "core", "combined");
@@ -89,6 +89,7 @@ reg("CSC3122", "optional", "theory");
 reg("CSC3132", "optional", "theory");
 reg("CSC3142", "optional", "theory");
 reg("CSC3152", "optional", "combined");
+reg("MAT313β", "optional", "combined");
 
 // Level 3 – Semester 2
 reg("CSC3216", "core", "practical");

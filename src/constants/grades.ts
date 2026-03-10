@@ -20,6 +20,7 @@ export const GRADE_SCALE: Record<string, number> = {
   "E-": 0.0,
   F: 0.0,
   MC: 0.0,
+  Wh: 0.0,
 };
 
 /** All valid grade strings. */
@@ -54,5 +55,5 @@ export const DEGREE_CREDIT_TARGETS = [
 export const GRADE_ORDER = [
   "A+", "A", "A-", "B+", "B", "B-",
   "C+", "C", "C-", "D+", "D",
-  "E", "E*", "E+", "E-", "F", "MC",
+  "E", "E*", "E+", "E-", "F", "MC", "Wh",
 ] as const;

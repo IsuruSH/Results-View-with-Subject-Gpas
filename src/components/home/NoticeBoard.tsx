@@ -12,13 +12,16 @@ import {
   Clock,
   ExternalLink,
 } from "lucide-react";
-import type { Notice, NoticesData } from "../../types";
+import { Loader2 } from "lucide-react";
+import type { Notice } from "../../types";
 import NoticeViewer from "./NoticeViewer";
 
 interface NoticeBoardProps {
-  noticesData: NoticesData | null;
+  recentNotices: Notice[];
+  previousNotices: Notice[];
   sessionId: string | null;
   loading?: boolean;
+  streaming?: boolean;
 }
 
 const FILE_TYPE_CONFIG: Record<
@@ -112,12 +115,23 @@ function NoticeCard({
   );
 }
 
-export default function NoticeBoard({ noticesData, sessionId, loading }: NoticeBoardProps) {
+export default function NoticeBoard({
+  recentNotices,
+  previousNotices,
+  sessionId,
+  loading,
+  streaming,
+}: NoticeBoardProps) {
   const [activeTab, setActiveTab] = useState<"recent" | "previous">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingNotice, setViewingNotice] = useState<Notice | null>(null);
 
-  if (loading) {
+  const recent = recentNotices;
+  const previous = previousNotices;
+  const hasData = recent.length > 0 || previous.length > 0;
+
+  // Only show skeleton if loading AND no data arrived yet (streaming may have begun)
+  if (loading && !hasData) {
     return (
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 animate-pulse">
         <div className="h-4 bg-gray-200 rounded w-1/3 mb-4" />
@@ -130,8 +144,6 @@ export default function NoticeBoard({ noticesData, sessionId, loading }: NoticeB
     );
   }
 
-  const recent = Array.isArray(noticesData?.recentNotices) ? noticesData.recentNotices : [];
-  const previous = Array.isArray(noticesData?.previousNotices) ? noticesData.previousNotices : [];
   const notices = activeTab === "recent" ? recent : previous;
   const totalCount = recent.length + previous.length;
 
@@ -206,7 +218,7 @@ export default function NoticeBoard({ noticesData, sessionId, loading }: NoticeB
 
         {/* Content */}
         <div className="px-4 pb-4">
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && !streaming ? (
             <div className="flex items-center justify-center gap-2 py-8 text-gray-400">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">
@@ -217,25 +229,24 @@ export default function NoticeBoard({ noticesData, sessionId, loading }: NoticeB
             </div>
           ) : (
             <div className="space-y-1.5 max-h-[420px] overflow-y-auto pr-1 scrollbar-thin">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab + searchQuery}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  className="space-y-1.5"
-                >
-                  {filtered.map((notice, i) => (
-                    <NoticeCard
-                      key={`${activeTab}-${notice.id}`}
-                      notice={notice}
-                      onView={setViewingNotice}
-                      index={i}
-                    />
-                  ))}
-                </motion.div>
+              <AnimatePresence mode="popLayout">
+                {filtered.map((notice, i) => (
+                  <NoticeCard
+                    key={`${activeTab}-${notice.id}-${notice.title}`}
+                    notice={notice}
+                    onView={setViewingNotice}
+                    index={i}
+                  />
+                ))}
               </AnimatePresence>
+
+              {/* Streaming indicator */}
+              {streaming && (
+                <div className="flex items-center justify-center gap-2 py-3 text-gray-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span className="text-xs">Loading more notices...</span>
+                </div>
+              )}
             </div>
           )}
         </div>

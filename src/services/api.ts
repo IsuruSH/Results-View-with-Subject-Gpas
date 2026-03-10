@@ -1,6 +1,5 @@
 import {
   getCached,
-  setCached,
   dedupFetch,
   CACHE_KEYS,
 } from "./dataCache";
@@ -71,8 +70,8 @@ export async function fetchResults(
         credentials: "include",
       }
     );
+    if (!response.ok) throw new Error(`Results fetch failed (${response.status})`);
     const data = await response.json();
-    // Also update the sessionStorage cache for Home page fallback
     try {
       sessionStorage.setItem("homeGpaCache", JSON.stringify(data));
     } catch {
@@ -95,9 +94,8 @@ export async function fetchHomeData(sessionId: string) {
       headers: { authorization: sessionId },
       credentials: "include",
     });
-    const data = await response.json();
-    setCached(key, data);
-    return data;
+    if (!response.ok) throw new Error(`Home data fetch failed (${response.status})`);
+    return response.json();
   });
 }
 
@@ -114,9 +112,8 @@ export async function fetchCourseRegistration(sessionId: string) {
       headers: { authorization: sessionId },
       credentials: "include",
     });
-    const data = await response.json();
-    setCached(key, data);
-    return data;
+    if (!response.ok) throw new Error(`Course registration fetch failed (${response.status})`);
+    return response.json();
   });
 }
 
@@ -133,53 +130,79 @@ export async function fetchNotices(sessionId: string) {
       headers: { authorization: sessionId },
       credentials: "include",
     });
-    const data = await response.json();
-    setCached(key, data);
-    return data;
+    if (!response.ok) throw new Error(`Notices fetch failed (${response.status})`);
+    return response.json();
   });
 }
 
 /**
  * Stream notices from the server via SSE.
+ * Calls onNotice for each notice as it arrives, onDone when the stream ends,
+ * and onError if the connection fails or is dropped.
  */
 export async function streamNotices(
   sessionId: string,
   onNotice: (type: "recent" | "previous", notice: any) => void,
-  onDone: () => void
+  onDone: () => void,
+  onError?: (err: Error) => void
 ) {
-  const response = await fetch(`${SERVER_URL}/notices/stream`, {
-    headers: { authorization: sessionId },
-    credentials: "include",
-  });
+  let doneCalled = false;
+  const callDone = () => {
+    if (!doneCalled) {
+      doneCalled = true;
+      onDone();
+    }
+  };
 
-  if (!response.body) return;
+  try {
+    const response = await fetch(`${SERVER_URL}/notices/stream`, {
+      headers: { authorization: sessionId },
+      credentials: "include",
+    });
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
+    if (!response.ok) {
+      throw new Error(`Notices stream failed (${response.status})`);
+    }
+    if (!response.body) {
+      callDone();
+      return;
+    }
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
 
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        try {
-          const { type, notice } = JSON.parse(line.slice(6));
-          onNotice(type, notice);
-        } catch {
-          // ignore parse errors on partial data
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            if (parsed.type && parsed.notice) {
+              onNotice(parsed.type, parsed.notice);
+            }
+          } catch {
+            // ignore parse errors on partial/malformed data
+          }
+        } else if (line.startsWith("event: done")) {
+          callDone();
+        } else if (line.startsWith("event: error")) {
+          onError?.(new Error("Server reported streaming error"));
         }
-      } else if (line.startsWith("event: done")) {
-        onDone();
       }
     }
+
+    callDone();
+  } catch (err) {
+    onError?.(err instanceof Error ? err : new Error(String(err)));
+    callDone();
   }
-  onDone();
 }
 
 // ---------------------------------------------------------------------------

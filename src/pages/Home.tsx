@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
-import { fetchHomeData, streamNotices } from "../services/api";
+import { fetchHomeData } from "../services/api";
 import {
   getProfileImage,
   setProfileImage as cacheProfileImage,
   getCached,
-  setCached,
   CACHE_KEYS,
 } from "../services/dataCache";
-import type { HomeData, GpaResults, Notice, NoticesData } from "../types";
+import type { HomeData, GpaResults } from "../types";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -18,20 +17,7 @@ import HeroSection from "../components/home/HeroSection";
 import QuickActions from "../components/home/QuickActions";
 import AcademicServices from "../components/home/AcademicServices";
 import MentorCard from "../components/home/MentorCard";
-import NoticeBoard from "../components/home/NoticeBoard";
 import GpaSummaryCard from "../components/home/GpaSummaryCard";
-
-function seedNotices(): { recent: Notice[]; previous: Notice[]; fromCache: boolean } {
-  const cached = getCached<NoticesData>(CACHE_KEYS.notices);
-  if (cached) {
-    return {
-      recent: Array.isArray(cached.recentNotices) ? cached.recentNotices : [],
-      previous: Array.isArray(cached.previousNotices) ? cached.previousNotices : [],
-      fromCache: true,
-    };
-  }
-  return { recent: [], previous: [], fromCache: false };
-}
 
 export default function Home() {
   const { session, username, signOut, consumeInitialResults } = useAuth();
@@ -43,12 +29,6 @@ export default function Home() {
   const [homeData, setHomeData] = useState<HomeData | null>(
     () => getCached<HomeData>(CACHE_KEYS.homeData)
   );
-
-  const [noticesSeed] = useState(seedNotices);
-  const [recentNotices, setRecentNotices] = useState<Notice[]>(noticesSeed.recent);
-  const [previousNotices, setPreviousNotices] = useState<Notice[]>(noticesSeed.previous);
-  const [noticesStreaming, setNoticesStreaming] = useState(false);
-  const [noticesLoading, setNoticesLoading] = useState(!noticesSeed.fromCache);
 
   const [cachedResults, setCachedResults] = useState<GpaResults | null>(() => {
     if (username) {
@@ -69,8 +49,6 @@ export default function Home() {
   const [loading, setLoading] = useState(() => !getCached(CACHE_KEYS.homeData));
 
   const fetchedRef = useRef(false);
-  const recentRef = useRef(recentNotices);
-  const previousRef = useRef(previousNotices);
 
   const handleSignOut = async () => {
     try {
@@ -103,48 +81,6 @@ export default function Home() {
       })
       .catch(() => toast.error("Error loading home data"))
       .finally(() => setLoading(false));
-
-    // If notices were served from cache, skip streaming
-    if (noticesSeed.fromCache) return;
-
-    // Stream notices — each notice renders as it arrives
-    setNoticesStreaming(true);
-
-    streamNotices(
-      session,
-      (type, notice) => {
-        if (!notice?.title || !notice?.date) return;
-
-        // Hide the full loading skeleton once the first notice arrives
-        setNoticesLoading(false);
-
-        if (type === "recent") {
-          const list = recentRef.current;
-          if (list.some((n) => n.title === notice.title && n.date === notice.date)) return;
-          const next = [...list, notice];
-          recentRef.current = next;
-          setRecentNotices(next);
-        } else {
-          const list = previousRef.current;
-          if (list.some((n) => n.title === notice.title && n.date === notice.date)) return;
-          const next = [...list, notice];
-          previousRef.current = next;
-          setPreviousNotices(next);
-        }
-      },
-      () => {
-        // Stream finished — cache the final result for instant re-navigation
-        setNoticesStreaming(false);
-        setNoticesLoading(false);
-        setCached(CACHE_KEYS.notices, {
-          recentNotices: recentRef.current,
-          previousNotices: previousRef.current,
-        });
-      },
-      (err) => {
-        console.warn("Notice streaming error:", err.message);
-      }
-    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, username, consumeInitialResults]);
 
@@ -172,13 +108,6 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-6">
             <QuickActions />
             <AcademicServices />
-            <NoticeBoard
-              recentNotices={recentNotices}
-              previousNotices={previousNotices}
-              sessionId={session}
-              loading={noticesLoading}
-              streaming={noticesStreaming}
-            />
           </div>
 
           {/* Right column - 1/3 */}

@@ -96,7 +96,7 @@ function RequirementList({
 function DepartmentsContent() {
   const departments = [
     { name: "Computer Science", prefix: "CSC / COM", color: "bg-blue-500" },
-    { name: "Mathematics", prefix: "MAT", color: "bg-indigo-500" },
+    { name: "Mathematics", prefix: "MAT / MSP", color: "bg-indigo-500" },
     {
       name: "Applied Mathematics",
       prefix: "AMT / IMT",

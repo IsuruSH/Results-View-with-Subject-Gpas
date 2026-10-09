@@ -124,7 +124,10 @@ function norm(code: string): string {
 // ---------------------------------------------------------------------------
 
 const CS_PREFIXES = ["CSC", "COM"];
-const MATH_PREFIXES = ["MAT", "AMT", "IMT"];
+// MSP = Mathematics Special course units. They are Mathematics subjects, so
+// they must count towards maths credit and grade requirements — most of all
+// for the Mathematics Special degree, where they are the specialist core.
+const MATH_PREFIXES = ["MAT", "AMT", "IMT", "MSP"];
 
 function creditsWithMinGrade(
   subjects: SubjectBreakdownRow[],

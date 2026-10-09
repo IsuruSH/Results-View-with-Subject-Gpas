@@ -3,6 +3,25 @@ import { RefreshCw } from "lucide-react";
 import { GRADE_OPTIONS, GRADE_SCALE } from "../../constants/grades";
 import type { RepeatedSubject } from "../../types";
 
+/**
+ * A repeat is capped at grade C (2.00) — however well the student performs,
+ * the recorded grade cannot exceed it.
+ *
+ * The exception is an approved MC (medical certificate): that sitting counts
+ * as a first attempt rather than a repeat, so no cap applies and every grade
+ * stays selectable. Offering A+ on a genuinely capped subject would let a
+ * student calculate a GPA the regulations cannot produce.
+ */
+const REPEAT_CAP_VALUE = GRADE_SCALE["C"];
+
+const CAPPED_GRADE_OPTIONS = GRADE_OPTIONS.filter(
+  (g) => (GRADE_SCALE[g] ?? 0) <= REPEAT_CAP_VALUE
+);
+
+function hasMcAttempt(subject: RepeatedSubject): boolean {
+  return subject.attempts?.some((a) => a.grade === "MC") ?? false;
+}
+
 interface RepeatedSubjectsProps {
   repeatedSubjects: RepeatedSubject[];
   editableGrades: Record<string, string>;
@@ -36,6 +55,9 @@ export default function RepeatedSubjects({
           <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
             {repeatedSubjects.length}
           </span>
+          <span className="hidden sm:inline text-xs text-gray-400">
+            grades capped at C, except after an MC
+          </span>
         </div>
 
         {/* Toggle switch */}
@@ -59,6 +81,15 @@ export default function RepeatedSubjects({
           const gradeValue = GRADE_SCALE[currentGrade] ?? 0;
           const progressPercent = (gradeValue / 4.0) * 100;
 
+          // MC attempts are not capped; everything else stops at C.
+          const uncapped = hasMcAttempt(subject);
+          const options = uncapped ? GRADE_OPTIONS : CAPPED_GRADE_OPTIONS;
+          // A grade carried over from before the cap was applied would vanish
+          // from the list and silently reset the <select>; keep it visible.
+          const gradeOptions = options.includes(currentGrade)
+            ? options
+            : [currentGrade, ...options];
+
           return (
             <div
               key={subject.subjectCode}
@@ -73,9 +104,19 @@ export default function RepeatedSubjects({
                   <h4 className="text-sm font-semibold text-gray-900 truncate">
                     {subject.subjectName}
                   </h4>
-                  <span className="text-xs font-mono text-indigo-600">
-                    {subject.subjectCode}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-mono text-indigo-600">
+                      {subject.subjectCode}
+                    </span>
+                    {uncapped && (
+                      <span
+                        title="An earlier attempt was an approved MC, so this sitting counts as a first attempt and is not capped at C."
+                        className="text-[10px] font-semibold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded-full"
+                      >
+                        MC · not capped
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <select
                   value={currentGrade}
@@ -83,9 +124,14 @@ export default function RepeatedSubjects({
                     onGradeChange(subject.subjectCode, e.target.value)
                   }
                   disabled={!includeRepeated}
+                  title={
+                    uncapped
+                      ? "Not capped — an earlier attempt was an approved MC"
+                      : "A repeat cannot be graded above C"
+                  }
                   className="w-20 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-50"
                 >
-                  {GRADE_OPTIONS.map((grade) => (
+                  {gradeOptions.map((grade) => (
                     <option key={grade} value={grade}>
                       {grade}
                     </option>

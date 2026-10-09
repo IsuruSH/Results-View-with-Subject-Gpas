@@ -33,8 +33,8 @@ Results-View-with-Subject-Gpas/
 │   │   ├── common/      # ProtectedRoute
 │   │   ├── dashboard/   # Results page: header/footer, GPA gauges, charts,
 │   │   │                #   calculator, simulators, table, Excel/PDF export
-│   │   ├── home/        # Home page: hero, quick actions, mentor card,
-│   │   │                #   notice board + viewer, GPA summary
+│   │   ├── home/        # Home page: hero, quick actions, academic services,
+│   │   │                #   mentor card, GPA summary
 │   │   └── guide/       # DegreeProgress — degree requirement evaluation
 │   ├── pages/           # One file per route
 │   ├── services/
@@ -96,7 +96,7 @@ Vite loads `.env` for `vite dev` and `.env.production` for `vite build`. Both ar
 
 ## Features
 
-**Home** — profile hero with GPA and credits at a glance, quick actions and academic service links that deep-link into FOSMIS, mentor contact card, and a notice board that receives notices over SSE one at a time rather than blocking on the full page load. Notices are identical for every student, so the backend serves them from a shared cache and this is normally instant. Notices open in an in-app viewer that handles PDFs, Office documents, and images.
+**Home** — profile hero with GPA and credits at a glance, quick actions and academic service links that deep-link into FOSMIS, mentor contact card, and a GPA summary.
 
 **Results** — the main dashboard. Degree-class predictor, per-department GPA gauges, credit progress against the 90/120-credit targets, level-by-level GPA trend, grade distribution, department radar, the full FOSMIS results table, and three planning tools behind tabs: a manual GPA calculator, a what-if simulator, and a target planner that works backwards from a desired GPA. Exports to Excel and PDF.
 

@@ -23,7 +23,12 @@ export default function Login() {
         await Promise.resolve(signIn(username, password));
         navigate("/results");
       } catch (error) {
-        toast.error("Invalid credentials");
+        // Show the server's reason — a FOSMIS outage is not a bad password.
+        toast.error(
+          error instanceof Error && error.message
+            ? error.message
+            : "Invalid credentials"
+        );
       } finally {
         setTimeout(() => setLoading(false), 200);
       }

@@ -27,7 +27,17 @@ export async function login(
   });
 
   if (!response.ok) {
-    throw new Error("Authentication failed");
+    // The server distinguishes a rejected password (401) from FOSMIS being
+    // unreachable (503). Surface its message so a timeout doesn't read as
+    // "wrong password" and send the user off to reset a working one.
+    let message = "Authentication failed";
+    try {
+      const body = await response.json();
+      if (body?.error) message = body.error;
+    } catch {
+      // non-JSON body — keep the default
+    }
+    throw new Error(message);
   }
 
   return response.json();

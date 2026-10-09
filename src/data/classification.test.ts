@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isCoreCourse, getCourseClassification } from './src/data/courseClassifications';
+import { isCoreCourse, getCourseClassification } from './courseClassifications';
 
 describe('Course Classification Group Overrides', () => {
     it('should correctly identify MAT313β as Optional for BCS', () => {

@@ -9,7 +9,7 @@ import {
   setCached,
   CACHE_KEYS,
 } from "../services/dataCache";
-import type { HomeData, GpaResults, NoticesData } from "../types";
+import type { HomeData, GpaResults, Notice, NoticesData } from "../types";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -21,6 +21,18 @@ import MentorCard from "../components/home/MentorCard";
 import NoticeBoard from "../components/home/NoticeBoard";
 import GpaSummaryCard from "../components/home/GpaSummaryCard";
 
+function seedNotices(): { recent: Notice[]; previous: Notice[]; fromCache: boolean } {
+  const cached = getCached<NoticesData>(CACHE_KEYS.notices);
+  if (cached) {
+    return {
+      recent: Array.isArray(cached.recentNotices) ? cached.recentNotices : [],
+      previous: Array.isArray(cached.previousNotices) ? cached.previousNotices : [],
+      fromCache: true,
+    };
+  }
+  return { recent: [], previous: [], fromCache: false };
+}
+
 export default function Home() {
   const { session, username, signOut, consumeInitialResults } = useAuth();
   usePageTitle("Home");
@@ -31,19 +43,13 @@ export default function Home() {
   const [homeData, setHomeData] = useState<HomeData | null>(
     () => getCached<HomeData>(CACHE_KEYS.homeData)
   );
-  const [noticesData, setNoticesData] = useState<NoticesData>({
-    recentNotices: [],
-    previousNotices: [],
-  });
 
-  // Seeds noticesData from cache on mount
-  useEffect(() => {
-    const cached = getCached<NoticesData>(CACHE_KEYS.notices);
-    if (cached) {
-      setNoticesData(cached);
-      setNoticesLoading(false);
-    }
-  }, []);
+  const [noticesSeed] = useState(seedNotices);
+  const [recentNotices, setRecentNotices] = useState<Notice[]>(noticesSeed.recent);
+  const [previousNotices, setPreviousNotices] = useState<Notice[]>(noticesSeed.previous);
+  const [noticesStreaming, setNoticesStreaming] = useState(false);
+  const [noticesLoading, setNoticesLoading] = useState(!noticesSeed.fromCache);
+
   const [cachedResults, setCachedResults] = useState<GpaResults | null>(() => {
     if (username) {
       const mem = getCached<GpaResults>(CACHE_KEYS.results(username, "4"));
@@ -60,14 +66,11 @@ export default function Home() {
   const [profileImage, setProfileImage] = useState<string | null>(() =>
     getProfileImage(username)
   );
-
-  // Loading flags — false if data was seeded from cache (no spinner flash)
   const [loading, setLoading] = useState(() => !getCached(CACHE_KEYS.homeData));
-  const [noticesLoading, setNoticesLoading] = useState(
-    () => !getCached(CACHE_KEYS.notices)
-  );
 
   const fetchedRef = useRef(false);
+  const recentRef = useRef(recentNotices);
+  const previousRef = useRef(previousNotices);
 
   const handleSignOut = async () => {
     try {
@@ -79,7 +82,6 @@ export default function Home() {
 
   // ---------------------------------------------------------------------------
   // Independent fetches — each section updates as its data arrives (streaming)
-  // No Promise.allSettled — fast data renders immediately, slow data streams in.
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
@@ -102,39 +104,48 @@ export default function Home() {
       .catch(() => toast.error("Error loading home data"))
       .finally(() => setLoading(false));
 
-    // Fire notices fetch independently — renders incrementally as data streams in
+    // If notices were served from cache, skip streaming
+    if (noticesSeed.fromCache) return;
+
+    // Stream notices — each notice renders as it arrives
+    setNoticesStreaming(true);
+
     streamNotices(
       session,
-      (type: "recent" | "previous", notice: any) => {
-        if (!notice || !type || !notice.title || !notice.date) return;
+      (type, notice) => {
+        if (!notice?.title || !notice?.date) return;
+
+        // Hide the full loading skeleton once the first notice arrives
         setNoticesLoading(false);
-        setNoticesData((prev) => {
-          if (!prev) return { recentNotices: [notice], previousNotices: [] }; // should not happen with fixed initialization
 
-          const listName = type === "recent" ? "recentNotices" : "previousNotices";
-          const currentList = prev[listName] || [];
-
-          // Check for exact duplicates (SSE might re-send if connection flaps)
-          if (currentList.some((n: any) => n && n.title === notice.title && n.date === notice.date))
-            return prev;
-
-          const next = {
-            ...prev,
-            [listName]: [...currentList, notice],
-          };
-
-          // Sync to cache for next load
-          setCached(CACHE_KEYS.notices, next);
-          return next;
-        });
+        if (type === "recent") {
+          const list = recentRef.current;
+          if (list.some((n) => n.title === notice.title && n.date === notice.date)) return;
+          const next = [...list, notice];
+          recentRef.current = next;
+          setRecentNotices(next);
+        } else {
+          const list = previousRef.current;
+          if (list.some((n) => n.title === notice.title && n.date === notice.date)) return;
+          const next = [...list, notice];
+          previousRef.current = next;
+          setPreviousNotices(next);
+        }
       },
       () => {
+        // Stream finished — cache the final result for instant re-navigation
+        setNoticesStreaming(false);
         setNoticesLoading(false);
+        setCached(CACHE_KEYS.notices, {
+          recentNotices: recentRef.current,
+          previousNotices: previousRef.current,
+        });
+      },
+      (err) => {
+        console.warn("Notice streaming error:", err.message);
       }
-    ).catch((err) => {
-      console.error("Notice streaming failed:", err);
-      setNoticesLoading(false);
-    });
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, username, consumeInitialResults]);
 
   return (
@@ -161,7 +172,13 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-6">
             <QuickActions />
             <AcademicServices />
-            <NoticeBoard noticesData={noticesData} sessionId={session} loading={noticesLoading} />
+            <NoticeBoard
+              recentNotices={recentNotices}
+              previousNotices={previousNotices}
+              sessionId={session}
+              loading={noticesLoading}
+              streaming={noticesStreaming}
+            />
           </div>
 
           {/* Right column - 1/3 */}

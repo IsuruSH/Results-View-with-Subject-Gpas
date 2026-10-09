@@ -4,6 +4,11 @@ import type { GpaResults } from "../../types";
 
 interface DepartmentRadarProps {
   results: GpaResults;
+  /**
+   * Render without the card chrome (background, border, padding), for use
+   * inside a panel that already provides it — see GpaOverview.
+   */
+  bare?: boolean;
 }
 
 const DEPARTMENTS = [
@@ -14,6 +19,25 @@ const DEPARTMENTS = [
   { key: "botGpa" as const, label: "Botany" },
   { key: "csGpa" as const, label: "CS" },
 ];
+
+/** A radar needs at least 3 axes to be a shape rather than a line. */
+const MIN_AXES = 3;
+
+function activeDepartments(results: GpaResults) {
+  return DEPARTMENTS.filter((d) => {
+    const v = parseFloat((results[d.key] as string) ?? "");
+    return !isNaN(v) && v > 0;
+  });
+}
+
+/**
+ * Whether the radar will render anything. Callers that lay the radar out in a
+ * grid need to know this up front, so they can drop the whole column instead
+ * of leaving an empty gap where a null render used to be.
+ */
+export function hasRadarData(results: GpaResults): boolean {
+  return activeDepartments(results).length >= MIN_AXES;
+}
 
 const SIZE = 240;
 const CX = SIZE / 2;
@@ -48,15 +72,14 @@ function makeGridPolygon(level: number, count: number): string {
   }).join(" ");
 }
 
-export default function DepartmentRadar({ results }: DepartmentRadarProps) {
+export default function DepartmentRadar({
+  results,
+  bare = false,
+}: DepartmentRadarProps) {
   // Filter to only departments where the student has a GPA
-  const activeDepts = DEPARTMENTS.filter((d) => {
-    const v = parseFloat((results[d.key] as string) ?? "");
-    return !isNaN(v) && v > 0;
-  });
+  const activeDepts = activeDepartments(results);
 
-  // Only render if at least 3 departments have data
-  if (activeDepts.length < 3) return null;
+  if (activeDepts.length < MIN_AXES) return null;
 
   const values = activeDepts.map((d) => {
     const v = parseFloat((results[d.key] as string) ?? "");
@@ -67,15 +90,32 @@ export default function DepartmentRadar({ results }: DepartmentRadarProps) {
   const dataPolygon = makePolygon(values);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-5">
-      <div className="flex items-center gap-2 mb-4">
+    <div
+      className={
+        bare
+          ? ""
+          : "bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-5"
+      }
+    >
+      <div
+        className={`flex items-center gap-2 ${
+          bare ? "justify-center mb-1" : "mb-4"
+        }`}
+      >
         <Radar className="w-4 h-4 text-gray-400" />
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+        <h3
+          className={`font-semibold text-gray-400 uppercase tracking-wider ${
+            bare ? "text-xs" : "text-sm"
+          }`}
+        >
           Department Strength
         </h3>
       </div>
 
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="w-full max-w-[260px] mx-auto">
+      <svg
+        viewBox={`0 0 ${SIZE} ${SIZE}`}
+        className={`w-full mx-auto ${bare ? "max-w-[220px]" : "max-w-[260px]"}`}
+      >
         {/* Grid polygons */}
         {[1, 2, 3, 4].map((level) => (
           <polygon
@@ -170,7 +210,9 @@ export default function DepartmentRadar({ results }: DepartmentRadarProps) {
               fontSize="8"
               fontWeight="700"
             >
-              {v.toFixed(1)}
+              {/* Two decimals: a GPA rounded to one decimal is a different
+                  GPA — 3.45 and 3.54 both showed as "3.5". */}
+              {v.toFixed(2)}
             </text>
           );
         })}

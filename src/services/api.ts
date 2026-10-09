@@ -92,7 +92,7 @@ export async function fetchResults(
 }
 
 /**
- * GET /home-data — Fetch FOSMIS homepage data (mentor, notices, etc.).
+ * GET /home-data — Fetch FOSMIS homepage data (student name, mentor, photo).
  */
 export async function fetchHomeData(sessionId: string) {
   const key = CACHE_KEYS.homeData;
@@ -125,94 +125,6 @@ export async function fetchCourseRegistration(sessionId: string) {
     if (!response.ok) throw new Error(`Course registration fetch failed (${response.status})`);
     return response.json();
   });
-}
-
-/**
- * GET /notices — Fetch structured notices from FOSMIS notice board.
- */
-export async function fetchNotices(sessionId: string) {
-  const key = CACHE_KEYS.notices;
-  const cached = getCached(key);
-  if (cached) return cached;
-
-  return dedupFetch(key, async () => {
-    const response = await fetch(`${SERVER_URL}/notices`, {
-      headers: { authorization: sessionId },
-      credentials: "include",
-    });
-    if (!response.ok) throw new Error(`Notices fetch failed (${response.status})`);
-    return response.json();
-  });
-}
-
-/**
- * Stream notices from the server via SSE.
- * Calls onNotice for each notice as it arrives, onDone when the stream ends,
- * and onError if the connection fails or is dropped.
- */
-export async function streamNotices(
-  sessionId: string,
-  onNotice: (type: "recent" | "previous", notice: any) => void,
-  onDone: () => void,
-  onError?: (err: Error) => void
-) {
-  let doneCalled = false;
-  const callDone = () => {
-    if (!doneCalled) {
-      doneCalled = true;
-      onDone();
-    }
-  };
-
-  try {
-    const response = await fetch(`${SERVER_URL}/notices/stream`, {
-      headers: { authorization: sessionId },
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Notices stream failed (${response.status})`);
-    }
-    if (!response.body) {
-      callDone();
-      return;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            const parsed = JSON.parse(line.slice(6));
-            if (parsed.type && parsed.notice) {
-              onNotice(parsed.type, parsed.notice);
-            }
-          } catch {
-            // ignore parse errors on partial/malformed data
-          }
-        } else if (line.startsWith("event: done")) {
-          callDone();
-        } else if (line.startsWith("event: error")) {
-          onError?.(new Error("Server reported streaming error"));
-        }
-      }
-    }
-
-    callDone();
-  } catch (err) {
-    onError?.(err instanceof Error ? err : new Error(String(err)));
-    callDone();
-  }
 }
 
 // ---------------------------------------------------------------------------

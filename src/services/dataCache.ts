@@ -90,7 +90,6 @@ export async function dedupFetch<T>(
 export const CACHE_KEYS = {
   results: (stnum: string, rlevel: string) => `results:${stnum}:${rlevel}`,
   homeData: "homeData",
-  notices: "notices",
   courseReg: "courseReg",
   profileImage: "profileImage",
 } as const;

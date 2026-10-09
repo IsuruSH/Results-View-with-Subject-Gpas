@@ -23,11 +23,11 @@ import ClassPredictor from "../components/dashboard/ClassPredictor";
 import CreditProgress from "../components/dashboard/CreditProgress";
 import GpaTrendChart from "../components/dashboard/GpaTrendChart";
 import GradeDistribution from "../components/dashboard/GradeDistribution";
-import DepartmentRadar from "../components/dashboard/DepartmentRadar";
 import AnalyticsTabs from "../components/dashboard/AnalyticsTabs";
 import WhatIfSimulator from "../components/dashboard/WhatIfSimulator";
 import GpaTargetPlanner from "../components/dashboard/GpaTargetPlanner";
 import ExcelExport from "../components/dashboard/ExcelExport";
+import RepeatPlanner from "../components/dashboard/RepeatPlanner";
 
 export default function Results() {
   const { signOut, username, session, consumeInitialResults } = useAuth();
@@ -255,17 +255,13 @@ export default function Results() {
                 className="grid grid-cols-1 lg:grid-cols-2 gap-6"
                 style={{ contentVisibility: "auto" }}
               >
-                <GpaTrendChart levelGpas={results.levelGpas} />
+                <GpaTrendChart
+                  levelGpas={results.levelGpas}
+                  subjectBreakdown={results.subjectBreakdown}
+                />
                 <GradeDistribution
                   distribution={results.gradeDistribution}
                 />
-              </div>
-            )}
-
-            {/* Department Radar - full width */}
-            {results && (
-              <div style={{ contentVisibility: "auto" }}>
-                <DepartmentRadar results={results} />
               </div>
             )}
 
@@ -309,6 +305,18 @@ export default function Results() {
               onGradeChange={handleGradeChange}
               onIncludeChange={setIncludeRepeated}
             />
+
+            {/* Repeat & Recovery Planner — ranks repeats by real GPA impact.
+                Sits last: the panel above is the interactive calculator, this
+                is the read-only analysis of it. */}
+            {results && (
+              <RepeatPlanner
+                subjectBreakdown={results.subjectBreakdown}
+                totalCredits={results.totalCredits}
+                totalGradePoints={results.totalGradePoints}
+                repeatedSubjects={repeatedSubjects}
+              />
+            )}
           </>
         )}
       </main>

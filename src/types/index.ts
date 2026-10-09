@@ -80,26 +80,17 @@ export interface HomeData {
   photoUrl: string;
 }
 
-export interface Notice {
-  id: number;
-  date: string;
-  time: string;
-  title: string;
-  fileUrl: string;
-  fileType: "pdf" | "docx" | "png" | "jpg" | "html" | "other";
-  content?: string;
-}
-
-export interface NoticesData {
-  recentNotices: Notice[];
-  previousNotices: Notice[];
-}
-
 export interface RegisteredCourse {
   code: string;
   name: string;
   degreeStatus: string;
   confirmation: string;
+  /** "Core" | "Optional" — only on the all-courses table. */
+  category?: string;
+  /** Offer-table only: who may register and what is required first. */
+  prerequisites?: string;
+  /** Offer-table only: "Registered !" / "Not Registered!". */
+  currentStatus?: string;
 }
 
 export interface CurrentSemester {
@@ -112,6 +103,11 @@ export interface CurrentSemester {
 export interface CourseRegistrationData {
   currentSemester: CurrentSemester;
   allCourses: RegisteredCourse[];
+  /** Optional / Non-Degree units on offer. Empty when no window is open. */
+  optionalCourses?: RegisteredCourse[];
+  registrationOpen?: boolean;
+  /** e.g. "2026-10-11" — advertised only while registration is open. */
+  closingDate?: string;
   totalConfirmedCredits: number;
   departments: string[];
   nonDegreeSubjects: string[];

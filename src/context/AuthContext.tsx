@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import type { AuthContextType, GpaResults } from "../types";
 import { login, logout } from "../services/api";
+import { analytics } from "../services/analytics";
 import {
   clearCache,
   setCached,
@@ -77,6 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setSession(sessionId);
     setUsername(formattedUsername);
+
+    analytics.loginSucceeded(Boolean(data.results));
   };
 
   const signOut = async () => {
@@ -98,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(null);
       setUsername(null);
       initialResultsRef.current = null;
+      analytics.signedOut();
     }
   };
 

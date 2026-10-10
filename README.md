@@ -91,8 +91,12 @@ npm run preview   # Preview the production build locally
 | Variable | Development | Production |
 |----------|-------------|------------|
 | `VITE_SERVER_URL` | `http://localhost:4000` | `https://res-proxy.onrender.com` |
+| `VITE_GA_MEASUREMENT_ID` | *(blank)* | `G-XXXXXXXXXX` |
+| `VITE_GA_DEBUG` | `false` | *(unset)* |
 
 Vite loads `.env` for `vite dev` and `.env.production` for `vite build`. Both are gitignored — on Vercel the production value comes from the project's environment settings rather than a committed file.
+
+`VITE_GA_MEASUREMENT_ID` is deliberately blank locally: with no id the gtag script is never loaded and every tracking call is a no-op, so development clicks stay out of the production reports. Set `VITE_GA_DEBUG=true` to send from `npm run dev` when you need to verify a new event.
 
 ## Features
 
@@ -141,6 +145,17 @@ Lookups normalise codes to lowercase and fold Greek characters to Latin. Entries
 ### Degree progress
 
 [DegreeProgress.tsx](src/components/guide/DegreeProgress.tsx) evaluates six programs (BSc and BCS × general, special-selection, special-completion). Its central design rule: a requirement that **cannot** be computed from available data is rendered as an explicit `unavailable` card explaining why, never estimated or silently omitted. Preserve that when extending it — a plausible-looking wrong answer about degree eligibility is worse than an honest gap.
+
+### Analytics
+
+[analytics.ts](src/services/analytics.ts) wraps Google Analytics 4 behind a small typed API. Two rules it exists to enforce:
+
+1. **No personal data reaches Google.** Student numbers, names, mentor details and grades are personal data; sending them would breach Google's Analytics terms as well as the students' trust. Events carry counts, categories and coarse buckets only — a GPA is reported as a band such as `2.00-2.99`, never the figure itself, and FOSMIS deep links report the path without the query string. If per-user counting is ever needed, `anonymousId()` derives a truncated SHA-256 hash; the raw number must never be sent.
+2. **It is inert unless configured.** With no `VITE_GA_MEASUREMENT_ID` the gtag script is never injected and every call is a no-op, so development traffic cannot reach production reports.
+
+Page views are sent manually from [usePageTracking](src/hooks/usePageTracking.ts), with `send_page_view: false` on the config — GA's automatic page view fires once per document load, so in a single-page app every route after the first would otherwise be invisible.
+
+Add new events as named methods on the `analytics` object rather than calling `trackEvent` inline. GA has no schema and never rejects anything, so a typo silently becomes a second, permanent event in the reports that cannot be merged away.
 
 ### Logic mirrored from the backend
 

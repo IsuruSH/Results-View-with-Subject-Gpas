@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
+import { analytics } from "../../services/analytics";
 
 interface PdfExportProps {
   contentRef: React.RefObject<HTMLDivElement>;
@@ -10,6 +11,7 @@ export default function PdfExport({ contentRef, username }: PdfExportProps) {
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
+    analytics.exported("pdf");
     if (!contentRef.current || exporting) return;
     setExporting(true);
 

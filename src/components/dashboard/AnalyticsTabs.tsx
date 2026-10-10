@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Calculator, FlaskConical, Target } from "lucide-react";
+import { analytics } from "../../services/analytics";
 
 interface Tab {
   id: string;
@@ -45,7 +46,10 @@ export default function AnalyticsTabs({
         {TABS.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              analytics.analyticsTabOpened(tab.id);
+              setActiveTab(tab.id);
+            }}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-3 text-xs sm:text-sm font-medium transition-colors relative ${
               activeTab === tab.id
                 ? "text-indigo-600"

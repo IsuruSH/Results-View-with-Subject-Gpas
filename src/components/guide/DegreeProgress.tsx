@@ -1,3 +1,4 @@
+import { analytics } from "../../services/analytics";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -1152,6 +1153,7 @@ export default function DegreeProgress({
                     <button
                       key={p.id}
                       onClick={() => {
+                        analytics.guideViewed(p.id);
                         setDegreeType(p.id);
                         setShowPicker(false);
                       }}

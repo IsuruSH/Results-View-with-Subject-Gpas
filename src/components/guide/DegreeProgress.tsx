@@ -1011,8 +1011,11 @@ export default function DegreeProgress({
   const [showPicker, setShowPicker] = useState(false);
 
   const gpa = results?.gpa ? parseFloat(results.gpa) : 0;
+  // `||` rather than `??` — a 0 from the course-registration page means the
+  // credit sentence was not found, so fall through to the results figure
+  // instead of failing every credit requirement against zero.
   const confirmedCredits =
-    courseData?.totalConfirmedCredits ?? results?.confirmedCredits ?? 0;
+    courseData?.totalConfirmedCredits || results?.confirmedCredits || 0;
   const subjects = results?.subjectBreakdown ?? [];
   const nonDegree = (results?.nonDegreeSubjects ?? []).map((s) =>
     s.toUpperCase()

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { FlaskConical, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { GRADE_SCALE, GRADE_OPTIONS } from "../../constants/grades";
 
 interface WhatIfSimulatorProps {

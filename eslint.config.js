@@ -23,6 +23,20 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      /**
+       * Two rules added in eslint-plugin-react-hooks v7, kept visible as
+       * warnings rather than enforced as errors.
+       *
+       * They target the React Compiler's stricter model. `set-state-in-effect`
+       * fires on the pattern every page here uses — fetch in an effect, then
+       * setState with the result — which is correct under React 18 and is how
+       * the data layer is built. Silencing them would hide genuinely useful
+       * advice; erroring on them would mean rewriting seven working
+       * data-loading paths for no behavioural gain. Revisit when moving to
+       * React 19 and the compiler, where the refactor pays for itself.
+       */
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/purity': 'warn',
     },
   }
 );

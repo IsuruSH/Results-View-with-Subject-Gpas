@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Target } from "lucide-react";
+
 import { GRADE_SCALE, CLASS_CUTOFFS, DEGREE_CREDIT_TARGETS } from "../../constants/grades";
 
 interface GpaTargetPlannerProps {

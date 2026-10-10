@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import toast from "react-hot-toast";
 
 import { fetchResults, calculateGPA } from "../services/api";
+import { analytics, gpaBand } from "../services/analytics";
 import { getProfileImage, getCached, CACHE_KEYS } from "../services/dataCache";
 import type { GpaFormData, GpaResults, RepeatedSubject } from "../types";
 import { usePageTitle } from "../hooks/usePageTitle";
@@ -62,6 +63,8 @@ export default function Results() {
   const gpaOverviewRef = useRef<HTMLDivElement>(null);
   const prefetchApplied = useRef(false);
   const prevRlevel = useRef(rlevel);
+  /** Signature of the last results payload reported to analytics. */
+  const reportedResults = useRef<string | null>(null);
 
   const handleSignOut = async () => {
     try {
@@ -84,6 +87,24 @@ export default function Results() {
         });
         setEditableGrades(initialGrades);
       }
+
+      // Counts and a GPA band only — never the student number or any grade.
+      // Deduped: applyResults runs again on a cache re-apply and twice under
+      // StrictMode, and each of those would be a separate view in GA.
+      const signature = [
+        gpaBand(data.gpa),
+        data.subjectBreakdown?.length ?? 0,
+        data.repeatedSubjects?.length ?? 0,
+      ].join("|");
+      if (reportedResults.current !== signature) {
+        reportedResults.current = signature;
+        const [band, subjects, repeats] = signature.split("|");
+        analytics.resultsViewed({
+          band,
+          subjects: Number(subjects),
+          repeats: Number(repeats),
+        });
+      }
     },
     []
   );
@@ -99,6 +120,7 @@ export default function Results() {
         const data = await fetchResults(session, username, rlevel);
         applyResults(data);
       } catch {
+        analytics.apiError("results", "failed");
         toast.error("Error fetching results");
       } finally {
         setLoading(false);
@@ -189,6 +211,10 @@ export default function Results() {
         filteredRepeated
       );
       setResults(data);
+      analytics.gpaCalculated({
+        manual_subjects: filteredManual.subjects.length,
+        repeats: filteredRepeated.subjects.length,
+      });
       toast.success("GPA calculated successfully!");
       setTimeout(() => {
         gpaOverviewRef.current?.scrollIntoView({
@@ -197,6 +223,7 @@ export default function Results() {
         });
       }, 100);
     } catch {
+      analytics.apiError("calculateGPA", "failed");
       toast.error("Error calculating GPA");
     }
   };
@@ -269,8 +296,14 @@ export default function Results() {
             <ResultsTable
               html={results?.data}
               rlevel={rlevel}
-              onRlevelChange={setRlevel}
-              onRefresh={() => loadResults()}
+              onRlevelChange={(value) => {
+                analytics.levelFilterChanged(value);
+                setRlevel(value);
+              }}
+              onRefresh={() => {
+                analytics.resultsRefreshed(rlevel);
+                loadResults();
+              }}
               loading={loading}
             />
 

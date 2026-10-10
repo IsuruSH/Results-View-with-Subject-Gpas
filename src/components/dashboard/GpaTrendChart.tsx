@@ -8,6 +8,7 @@ import {
   type TrendMode,
 } from "../../utils/gpaTrend";
 import type { SubjectBreakdownRow } from "../../types";
+import { analytics } from "../../services/analytics";
 
 interface GpaTrendChartProps {
   levelGpas: { level1?: string; level2?: string; level3?: string } | undefined;
@@ -117,7 +118,10 @@ export default function GpaTrendChart({
               <button
                 key={key}
                 type="button"
-                onClick={() => setChosenMode(key)}
+                onClick={() => {
+                  analytics.trendModeChanged(key);
+                  setChosenMode(key);
+                }}
                 aria-pressed={mode === key}
                 className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                   mode === key

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { RefreshCw, Info, TrendingUp, CheckCircle2 } from "lucide-react";
 import { buildRepeatPlan, classFor, projectGpa } from "../../utils/repeatPlan";
 import type { RepeatedSubject, SubjectBreakdownRow } from "../../types";
+import { analytics } from "../../services/analytics";
 
 /**
  * Repeat & Recovery Planner
@@ -216,20 +217,29 @@ export default function RepeatPlanner({
             <div className="flex items-center gap-1.5">
               {!isRecommended && recommended.length > 0 && (
                 <button
-                  onClick={() => setSelected(new Set(recommended))}
+                  onClick={() => {
+                    analytics.repeatPlannerUsed("recommended");
+                    setSelected(new Set(recommended));
+                  }}
                   className="text-xs font-medium text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded transition-colors"
                 >
                   Recommended
                 </button>
               )}
               <button
-                onClick={() => setSelected(new Set(ranked.map((r) => r.subjectCode)))}
+                onClick={() => {
+                  analytics.repeatPlannerUsed("all");
+                  setSelected(new Set(ranked.map((r) => r.subjectCode)));
+                }}
                 className="text-xs font-medium text-gray-500 hover:text-gray-800 px-2 py-1 rounded transition-colors"
               >
                 All
               </button>
               <button
-                onClick={() => setSelected(new Set())}
+                onClick={() => {
+                  analytics.repeatPlannerUsed("clear");
+                  setSelected(new Set());
+                }}
                 className="text-xs font-medium text-gray-500 hover:text-gray-800 px-2 py-1 rounded transition-colors"
               >
                 Clear
@@ -258,7 +268,10 @@ export default function RepeatPlanner({
                   return (
                     <tr
                       key={s.subjectCode}
-                      onClick={() => toggle(s.subjectCode)}
+                      onClick={() => {
+                        analytics.repeatPlannerUsed("toggle");
+                        toggle(s.subjectCode);
+                      }}
                       className={`cursor-pointer transition-colors ${isOn ? "bg-emerald-50/40" : "hover:bg-gray-50/50 opacity-70"
                         }`}
                     >

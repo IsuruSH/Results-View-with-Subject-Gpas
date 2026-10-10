@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import type { SubjectBreakdownRow } from "../../types";
+import { analytics } from "../../services/analytics";
 
 interface ExcelExportProps {
   subjectBreakdown?: SubjectBreakdownRow[];
@@ -25,6 +26,7 @@ export default function ExcelExport({
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
+    analytics.exported("excel");
     if (!subjectBreakdown || subjectBreakdown.length === 0 || exporting) return;
     setExporting(true);
 

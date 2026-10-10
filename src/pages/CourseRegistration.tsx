@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { fetchCourseRegistration } from "../services/api";
+import { analytics } from "../services/analytics";
 import { getProfileImage, getCached, CACHE_KEYS } from "../services/dataCache";
 import type { CourseRegistrationData, RegisteredCourse } from "../types";
 import { DEGREE_CREDIT_TARGETS } from "../constants/grades";
@@ -85,7 +86,12 @@ export default function CourseRegistration() {
       // Uses centralized cache + dedup internally
       const resp = await fetchCourseRegistration(session);
       setData(resp);
+      analytics.coursesViewed({
+        registered: resp?.allCourses?.length ?? 0,
+        registration_open: Boolean(resp?.registrationOpen),
+      });
     } catch {
+      analytics.apiError("course-registration", "failed");
       toast.error("Error loading course registration");
     } finally {
       setLoading(false);

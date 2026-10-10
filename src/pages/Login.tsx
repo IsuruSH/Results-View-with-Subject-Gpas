@@ -5,6 +5,7 @@ import { GraduationCap, LogIn } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 import toast from "react-hot-toast";
+import { analytics } from "../services/analytics";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -19,16 +20,27 @@ export default function Login() {
       e.preventDefault();
       setLoading(true);
 
+      analytics.loginSubmitted();
+
       try {
         await Promise.resolve(signIn(username, password));
         navigate("/results");
       } catch (error) {
         // Show the server's reason — a FOSMIS outage is not a bad password.
-        toast.error(
+        const message =
           error instanceof Error && error.message
             ? error.message
-            : "Invalid credentials"
+            : "Invalid credentials";
+        // The same split the message makes: an outage is not a bad password,
+        // and conflating them in the reports would hide real downtime.
+        analytics.loginFailed(
+          /unreachable|unavailable|timed? ?out|503/i.test(message)
+            ? "unreachable"
+            : /invalid|credential|password/i.test(message)
+              ? "invalid_credentials"
+              : "error"
         );
+        toast.error(message);
       } finally {
         setTimeout(() => setLoading(false), 200);
       }

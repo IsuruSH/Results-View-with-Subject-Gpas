@@ -7,48 +7,61 @@ import CourseRegistration from "./pages/CourseRegistration";
 import AcademicGuide from "./pages/AcademicGuide";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
+import { usePageTracking } from "./hooks/usePageTracking";
+
+/**
+ * Routes live in their own component so that `usePageTracking` can sit inside
+ * the Router — `useLocation` throws outside it.
+ */
+function AppRoutes() {
+  usePageTracking();
+
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route
+        path="/results"
+        element={
+          <ProtectedRoute>
+            <Results />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/home"
+        element={
+          <ProtectedRoute>
+            <Home />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/courses"
+        element={
+          <ProtectedRoute>
+            <CourseRegistration />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/academic-guide"
+        element={
+          <ProtectedRoute>
+            <AcademicGuide />
+          </ProtectedRoute>
+        }
+      />
+      {/* Redirect root to /results for backwards compat */}
+      <Route path="/" element={<Navigate to="/results" replace />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/results"
-            element={
-              <ProtectedRoute>
-                <Results />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/home"
-            element={
-              <ProtectedRoute>
-                <Home />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/courses"
-            element={
-              <ProtectedRoute>
-                <CourseRegistration />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/academic-guide"
-            element={
-              <ProtectedRoute>
-                <AcademicGuide />
-              </ProtectedRoute>
-            }
-          />
-          {/* Redirect root to /results for backwards compat */}
-          <Route path="/" element={<Navigate to="/results" replace />} />
-        </Routes>
+        <AppRoutes />
       </BrowserRouter>
       <Toaster position="top-center" />
     </AuthProvider>

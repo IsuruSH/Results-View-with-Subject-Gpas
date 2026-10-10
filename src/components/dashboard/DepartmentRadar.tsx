@@ -44,6 +44,31 @@ const CX = SIZE / 2;
 const CY = SIZE / 2;
 const MAX_R = 90;
 
+/**
+ * Horizontal breathing room added to the viewBox, outside the radar itself.
+ *
+ * With an even number of axes, two of them point straight left and right, so
+ * their labels land on the very edge of a SIZE-wide box and get clipped —
+ * "Chemistry" rendered as "Chemist" and "Zoology" as "oolo". The radar
+ * geometry stays SIZE-based; only the visible box is wider.
+ */
+const PAD_X = 48;
+const VIEW_BOX = `${-PAD_X} 0 ${SIZE + PAD_X * 2} ${SIZE}`;
+
+/** Distance from centre at which the department name is drawn. */
+const LABEL_R = MAX_R + 20;
+
+/**
+ * Anchor a label by the direction it sits in, so text grows away from the
+ * chart instead of straddling the spoke: names on the right start at the
+ * spoke, names on the left end at it, and names near the vertical axis stay
+ * centred.
+ */
+function labelAnchor(dx: number): "start" | "middle" | "end" {
+  if (Math.abs(dx) < MAX_R * 0.25) return "middle";
+  return dx > 0 ? "start" : "end";
+}
+
 function polarToCart(
   angle: number,
   radius: number
@@ -113,8 +138,8 @@ export default function DepartmentRadar({
       </div>
 
       <svg
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className={`w-full mx-auto ${bare ? "max-w-[220px]" : "max-w-[260px]"}`}
+        viewBox={VIEW_BOX}
+        className={`w-full mx-auto ${bare ? "max-w-[300px]" : "max-w-[340px]"}`}
       >
         {/* Grid polygons */}
         {[1, 2, 3, 4].map((level) => (
@@ -174,16 +199,18 @@ export default function DepartmentRadar({
           ) : null;
         })}
 
-        {/* Labels */}
+        {/* Department names, outside the outermost ring */}
         {activeDepts.map((dept, i) => {
-          const labelR = MAX_R + 18;
-          const { x, y } = polarToCart(i * step, labelR);
+          const { x, y } = polarToCart(i * step, LABEL_R);
+          const anchor = labelAnchor(x - CX);
+          // Nudge horizontally-anchored names off the spoke by a hair.
+          const dx = anchor === "start" ? 3 : anchor === "end" ? -3 : 0;
           return (
             <text
               key={dept.key}
-              x={x}
+              x={x + dx}
               y={y}
-              textAnchor="middle"
+              textAnchor={anchor}
               dominantBaseline="middle"
               className="fill-gray-500"
               fontSize="9"
@@ -194,11 +221,13 @@ export default function DepartmentRadar({
           );
         })}
 
-        {/* Value labels */}
+        {/* Value labels, drawn just inside the vertex. Outside the vertex they
+            ran into the department name on the left and right spokes, where
+            the two sit closest together ("oolo3.70"). */}
         {values.map((v, i) => {
           if (v === 0) return null;
-          const r = (v / 4.0) * MAX_R + 10;
-          const { x, y } = polarToCart(i * step, r);
+          const vertexR = (v / 4.0) * MAX_R;
+          const { x, y } = polarToCart(i * step, Math.max(vertexR - 12, 16));
           return (
             <text
               key={`val-${i}`}
@@ -207,7 +236,7 @@ export default function DepartmentRadar({
               textAnchor="middle"
               dominantBaseline="middle"
               className="fill-indigo-600"
-              fontSize="8"
+              fontSize="8.5"
               fontWeight="700"
             >
               {/* Two decimals: a GPA rounded to one decimal is a different

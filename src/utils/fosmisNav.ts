@@ -1,3 +1,4 @@
+import { analytics } from "../services/analytics";
 import { decryptFromSession } from "./sessionCrypto";
 
 const FOSMIS_LOGIN_URL = "https://paravi.ruh.ac.lk/fosmis/login.php";
@@ -12,6 +13,13 @@ const FOSMIS_LOGIN_URL = "https://paravi.ruh.ac.lk/fosmis/login.php";
  * in-memory using the per-session AES key.
  */
 export async function openFosmisPage(targetUrl: string): Promise<void> {
+  // Record which FOSMIS destination was opened — the path only, never the
+  // query string, which can carry the student number.
+  try {
+    analytics.fosmisLinkOpened(new URL(targetUrl).pathname);
+  } catch {
+    analytics.fosmisLinkOpened("unknown");
+  }
   // If we already authenticated FOSMIS in this browser session, open directly
   if (sessionStorage.getItem("fosmis_browser_authed")) {
     window.open(targetUrl, "_blank", "noopener,noreferrer");

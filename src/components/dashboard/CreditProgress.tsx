@@ -13,8 +13,11 @@ export default function CreditProgress({
   confirmedCredits,
 }: CreditProgressProps) {
   const [degreeIdx, setDegreeIdx] = useState(0);
-  // Prefer confirmed credits from FOSMIS registration (includes courses without results yet)
-  const credits = confirmedCredits ?? totalCredits ?? 0;
+  // Prefer confirmed credits from FOSMIS registration (includes courses
+  // without results yet). `||` rather than `??`: the backend reports 0 when
+  // the page carried no credit sentence, and 0 means "unknown" here, not
+  // "zero credits" — with `??` that zero would suppress the card entirely.
+  const credits = confirmedCredits || totalCredits || 0;
   if (credits === 0) return null;
 
   const target = DEGREE_CREDIT_TARGETS[degreeIdx].credits;

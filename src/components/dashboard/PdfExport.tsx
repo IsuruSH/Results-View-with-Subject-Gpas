@@ -55,7 +55,7 @@ export default function PdfExport({ contentRef, username }: PdfExportProps) {
 
       // Content image
       const imgH = (canvas.height * usableW) / canvas.width;
-      let yPos = 28;
+      const yPos = 28;
 
       // If image is taller than one page, scale to fit
       const maxImgH = pageH - yPos - margin;

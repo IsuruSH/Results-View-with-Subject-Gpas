@@ -81,7 +81,7 @@ export default function Home() {
       })
       .catch(() => toast.error("Error loading home data"))
       .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [session, username, consumeInitialResults]);
 
   return (

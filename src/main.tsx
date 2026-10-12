@@ -8,6 +8,10 @@ import './index.css';
 // VITE_GA_MEASUREMENT_ID is unset.
 initAnalytics();
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
